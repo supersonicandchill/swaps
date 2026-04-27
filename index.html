@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
+<title>Away Game — Christian Parent’s Playbook</title>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #f8f9fa; font-family: 'DM Sans', system-ui, sans-serif; color: #1a1a1a; line-height: 1.6; }
+button { cursor: pointer; }
+.progress-bar { height: 10px; background: #e9ecef; border-radius: 9999px; overflow: hidden; }
+.progress-fill { height: 100%; transition: width 0.5s ease; }
+.team-card { background: #fff; border: 1px solid #dee2e6; border-radius: 16px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); }
+.delete-btn { background: #fee2e2; color: #ef4444; border: none; width: 32px; height: 32px; border-radius: 8px; font-size: 18px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState } = React;
+
+// ─── STORAGE ──────────────────────────────────────────────────────────────────
+function load(key, fb) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fb; } catch { return fb; } }
+function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+let _c = Date.now();
+function uid() { return "x" + (++_c).toString(36); }
+
+// ─── COLORS ───────────────────────────────────────────────────────────────────
+const C = {
+  bg0: "#f8f9fa", bg1: "#ffffff", bg2: "#f1f3f5", bg3: "#e9ecef",
+  border: "#dee2e6", borderHi: "#ff8c00",
+  text: "#1a1a1a", textSub: "#495057", textMuted: "#6c757d",
+  orange: "#ff8c00", green: "#00b36b"
+};
+
+// ─── VIRTUES (Complete) ───────────────────────────────────────────────────────
+const VIRTUES = {
+  L: { key:"L", label:"Love", icon:"❤️", tagline:"Others-first in a me-first culture", color:"#ff4d4d", bg:"#fff0f0", border:"#ff8c00",
+       scoreMeaning: "0=Never • 1=Rarely • 2=Sometimes • 3=Consistently puts others first",
+       strong: ["Celebrates teammates' success", "Shows genuine kindness", "Puts team above self"],
+       weak:   ["Selfish on and off the field", "Dismisses or ignores teammates", "Only cheers for own highlights"],
+       develop: ["After each game, name one teammate who helped you win", "Do one act of encouragement before you leave the field", "Pray: 'Lord, help me love my teammates the way You love me'"] },
+  P: { key:"P", label:"Peace", icon:"☮️", tagline:"Calm anchored in Christ", color:"#00b36b", bg:"#f0fff4", border:"#ff8c00",
+       scoreMeaning: "0=Constant anxiety • 1=Occasional calm • 2=Usually calm • 3=Peace that guards the heart",
+       strong: ["Stays composed under pressure", "Calms teammates in tense moments", "Bounces back quickly from mistakes"],
+       weak:   ["Anxious or panicked when things go wrong", "Spreads tension to teammates", "Dwells on errors during play"],
+       develop: ["Practice three slow breaths before any big moment", "Write down one worry this week and give it to God in prayer", "Memorize Phil. 4:7 — let it anchor your pregame routine"] },
+  S: { key:"S", label:"Self-Control", icon:"🛡️", tagline:"Responding instead of reacting", color:"#0077cc", bg:"#f0f8ff", border:"#ff8c00",
+       scoreMeaning: "0=Frequent outbursts • 1=Improving • 2=Usually controlled • 3=Strong self-discipline",
+       strong: ["Responds to bad calls without blowing up", "Keeps emotions in check under provocation", "Leads by example in discipline"],
+       weak:   ["Frequent outbursts or meltdowns", "Argues with officials or coaches", "Lets frustration hurt performance"],
+       develop: ["Identify your #1 trigger — name it, then make a plan for it", "After a bad call, count to 5 before you react", "Ask a trusted teammate to hold you accountable this week"] },
+  G: { key:"G", label:"Gentleness", icon:"🌿", tagline:"Strength under control", color:"#9c4dff", bg:"#f8f0ff", border:"#ff8c00",
+       scoreMeaning: "0=Often harsh • 1=Sometimes gentle • 2=Usually gentle • 3=Strength under control",
+       strong: ["Encourages struggling teammates", "Competes hard without being cruel", "Uses words that build up, not tear down"],
+       weak:   ["Often harsh or cutting with words", "Intimidates or belittles others", "Confuses meanness with toughness"],
+       develop: ["Before criticizing a teammate, ask: 'Is this kind AND true?'", "Find one struggling player this week and intentionally encourage them", "Journal: where did strength AND gentleness show up together today?"] },
+  H: { key:"H", label:"Humility", icon:"🙏", tagline:"Playing from identity, not for identity", color:"#ff8c00", bg:"#fff8f0", border:"#ff8c00",
+       scoreMeaning: "0=Very prideful • 1=Occasional humility • 2=Growing humility • 3=Consistently humble",
+       strong: ["Credits teammates and coaches for success", "Accepts coaching without defensiveness", "Secure enough to celebrate others"],
+       weak:   ["Takes credit, deflects blame", "Gets defensive when corrected", "Needs to be the star"],
+       develop: ["After your next win, publicly credit two specific teammates", "When corrected by a coach, respond: 'Thank you, I'll work on that'", "Ask yourself: 'Am I playing TO prove something or FROM knowing who I am?'"] },
+  Gr: { key:"Gr", label:"Gratitude", icon:"🙌", tagline:"Thankful in all circumstances", color:"#ffaa00", bg:"#fffdf0", border:"#ff8c00",
+       scoreMeaning: "0=Very entitled • 1=Occasional thanks • 2=Usually grateful • 3=Thankful in all circumstances",
+       strong: ["Thanks coaches, officials, and opponents", "Grateful for the opportunity to compete", "Positive attitude win or lose"],
+       weak:   ["Entitled attitude about playing time or roles", "Rarely thanks others", "Complains about conditions, calls, or teammates"],
+       develop: ["Start every practice with one thing you're grateful for about this team", "Write a one-line thank-you to a coach or teammate this week", "After a loss, find three genuine things to be thankful for before you leave"] },
+  J: { key:"J", label:"Joy", icon:"🎉", tagline:"Delight that outlasts the score", color:"#ff6600", bg:"#fff4f0", border:"#ff8c00",
+       scoreMeaning: "0=Joy is gone • 1=Rare joy • 2=Usually joyful • 3=Consistent delight",
+       strong: ["Genuine enjoyment of the game", "Joy that doesn't depend on the scoreboard", "Lifts the energy of those around them"],
+       weak:   ["Only happy when winning", "Drains team energy with negativity", "Has lost the love of the game"],
+       develop: ["Recall why you first fell in love with this sport — write it down", "Find one moment in each practice to just enjoy the game", "Remind yourself: the scoreboard is temporary, but who you're becoming is not"] }
+};
+
+const SCORE_LABELS = ["Missing", "Emerging", "Developing", "Strong"];
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function getCombo(scores) {
+  const strong = Object.values(scores).filter(v => v === 3).length;
+  const developing = Object.values(scores).filter(v => v >= 2).length;
+  const avg = (Object.values(scores).reduce((a,b) => a + b, 0) / 7).toFixed(1);
+
+  if (strong >= 5) return { label: "Kingdom Competitor", icon: "🏆", desc: `Avg ${avg}/3`, color: C.orange, progress: 95 };
+  if (developing >= 6) return { label: "Strong Disciple", icon: "🌟", desc: `Avg ${avg}/3`, color: C.green, progress: 85 };
+  return { label: "Developing Disciple", icon: "🌱", desc: `Avg ${avg}/3`, color: "#fd7e14", progress: Math.round(developing / 7 * 100) };
+}
+
+function calculateTeamProgress(athletes) {
+  if (athletes.length === 0) return { avgScore: "0.0", strongPercent: 0, totalAthletes: 0 };
+  let totalScore = 0, totalStrong = 0;
+  const totalVirtues = athletes.length * 7;
+
+  athletes.forEach(a => {
+    const scores = Object.values(a.scores || {});
+    totalScore += scores.reduce((a,b) => a + b, 0);
+    totalStrong += scores.filter(v => v === 3).length;
+  });
+
+  const avgScore = (totalScore / totalVirtues).toFixed(1);
+  const strongPercent = Math.round((totalStrong / totalVirtues) * 100);
+
+  return { avgScore, strongPercent, totalAthletes: athletes.length };
+}
+
+// ─── MODALS ───────────────────────────────────────────────────────────────────
+function Modal({title, onClose, children}) {
+  return (
+    <div style={{position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", zIndex:500, display:"flex", alignItems:"center", justifyContent:"center"}} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{background:"#fff", borderRadius:16, width:"92%", maxWidth:720, maxHeight:"92vh", overflow:"hidden", boxShadow:"0 25px 70px rgba(0,0,0,0.25)"}}>
+        <div style={{padding:"18px 24px", borderBottom:"1px solid #dee2e6", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+          <span style={{fontSize:21, fontWeight:800, color:C.orange}}>{title}</span>
+          <button onClick={onClose} style={{fontSize:24, background:"none", border:"none", color:"#666"}}>✕</button>
+        </div>
+        <div style={{padding:24, overflowY:"auto", maxHeight:"78vh"}}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDelete({name, onConfirm, onCancel}) {
+  return (
+    <Modal title="Delete Athlete" onClose={onCancel}>
+      <p style={{fontSize:16, marginBottom:24}}>Are you sure you want to permanently delete <strong>{name}</strong>?</p>
+      <p style={{color:"#ef4444", marginBottom:24}}>This cannot be undone.</p>
+      <div style={{display:"flex", gap:12, justifyContent:"flex-end"}}>
+        <button onClick={onCancel} style={{padding:"12px 24px", border:"none", background:"#ddd", borderRadius:10}}>Cancel</button>
+        <button onClick={onConfirm} style={{padding:"12px 28px", border:"none", background:"#ef4444", color:"#fff", borderRadius:10, fontWeight:700}}>Yes, Delete</button>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── EDIT MODAL ───────────────────────────────────────────────────────────────
+function EditModal({person, onSave, onClose}) {
+  const [data, setData] = useState({...person, notes: person.notes || ""});
+
+  const updateScore = (key, value) => setData(prev => ({...prev, scores: {...prev.scores, [key]: Number(value)}}));
+
+  return (
+    <Modal title={data.id ? "Edit Athlete" : "Add New Athlete"} onClose={onClose}>
+      <input placeholder="Athlete Name *" value={data.name||""} onChange={e=>setData({...data,name:e.target.value})} style={{width:"100%", padding:14, fontSize:17, border:`2px solid ${C.border}`, borderRadius:10, marginBottom:12}} />
+      <input placeholder="Role / Team (optional)" value={data.role||""} onChange={e=>setData({...data,role:e.target.value})} style={{width:"100%", padding:14, fontSize:17, border:`2px solid ${C.border}`, borderRadius:10, marginBottom:20}} />
+
+      <div style={{marginBottom:20}}>
+        <div style={{fontWeight:700, color:C.orange, marginBottom:12}}>Score Each Virtue (0–3)</div>
+        {Object.values(VIRTUES).map(t => (
+          <div key={t.key} style={{marginBottom:16, padding:16, background:"#fff", border:`1px solid ${t.border}`, borderRadius:12}}>
+            <div style={{display:"flex", alignItems:"center", gap:12, marginBottom:8}}>
+              <span style={{fontSize:28}}>{t.icon}</span>
+              <div style={{flex:1, fontWeight:700, color:t.color}}>{t.label}</div>
+            </div>
+            <div style={{fontSize:13, color:"#555", marginBottom:10}}>{t.scoreMeaning}</div>
+            <div style={{display:"flex", gap:6}}>
+              {[0,1,2,3].map(n => (
+                <button key={n} onClick={()=>updateScore(t.key,n)} style={{flex:1, padding:"10px", borderRadius:8, background: data.scores[t.key]===n ? C.orange : "#f1f3f5", color: data.scores[t.key]===n ? "#fff" : "#333", fontWeight:700}}>
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{marginBottom:20}}>
+        <div style={{fontWeight:700, marginBottom:8}}>Notes / Observations / Prayers</div>
+        <textarea value={data.notes} onChange={e=>setData({...data, notes:e.target.value})} placeholder="Key moments, growth areas, specific prayers..." style={{width:"100%", height:130, padding:14, border:`2px solid ${C.border}`, borderRadius:10, resize:"vertical"}} />
+      </div>
+
+      <div style={{display:"flex", gap:12, justifyContent:"flex-end"}}>
+        <button onClick={onClose} style={{padding:"12px 24px", border:"none", background:"#ddd", borderRadius:10}}>Cancel</button>
+        <button onClick={()=>onSave(data)} style={{padding:"12px 32px", border:"none", background:C.orange, color:"#fff", borderRadius:10, fontWeight:700}} disabled={!data.name?.trim()}>💾 Save Changes</button>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── PERSON DETAIL ────────────────────────────────────────────────────────────
+function PersonDetail({person, onClose, onEdit}) {
+  const [tab, setTab] = useState("assess");
+  const combo = getCombo(person.scores);
+
+  return (
+    <Modal title={person.name} onClose={onClose}>
+      <div style={{display:"flex", justifyContent:"space-between", marginBottom:20}}>
+        <div>
+          <div style={{fontSize:52}}>{combo.icon}</div>
+          <div style={{fontSize:24, fontWeight:800, color:combo.color}}>{combo.label}</div>
+        </div>
+        <button onClick={()=>{ onEdit(person); onClose(); }} style={{background:C.orange, color:"#fff", border:"none", padding:"10px 22px", borderRadius:10, fontWeight:700}}>✏ Edit</button>
+      </div>
+
+      <div style={{marginBottom:24}}>
+        <div style={{display:"flex", justifyContent:"space-between", fontSize:14, marginBottom:8}}>
+          <span>Character Progress</span>
+          <span>{combo.progress}%</span>
+        </div>
+        <div className="progress-bar">
+          <div className="progress-fill" style={{width: `${combo.progress}%`, background: combo.progress > 80 ? "linear-gradient(90deg,#00b36b,#34d399)" : combo.progress > 50 ? "linear-gradient(90deg,#ff8c00,#ffaa00)" : "#dc3545"}} />
+        </div>
+        <div style={{fontSize:13, color:C.textMuted, marginTop:6}}>
+          Last updated: {person.lastUpdated ? new Date(person.lastUpdated).toLocaleDateString() : "Never"}
+        </div>
+      </div>
+
+      <div style={{display:"flex", borderBottom:"3px solid #ff8c00", marginBottom:20}}>
+        {["assess","develop","notes"].map(t => (
+          <button key={t} onClick={()=>setTab(t)} style={{flex:1, padding:"14px", fontWeight:700, background:tab===t?C.orange:"#f1f3f5", color:tab===t?"#fff":"#333", border:"none"}}>
+            {t==="assess"?"📊 Profile":t==="develop"?"🛠 Develop":"📝 Notes"}
+          </button>
+        ))}
+      </div>
+
+      {tab==="assess" && Object.entries(person.scores).map(([k,v]) => {
+        const t = VIRTUES[k];
+        const showHas = v >= 2;
+        return (
+          <div key={k} style={{marginBottom:20, background:"#fff", border:`2px solid ${t.border}`, borderRadius:14, overflow:"hidden"}}>
+            <div style={{background:t.bg, padding:"16px 20px", display:"flex", alignItems:"center", gap:16}}>
+              <span style={{fontSize:42}}>{t.icon}</span>
+              <div style={{flex:1}}><div style={{fontSize:21, fontWeight:800, color:t.color}}>{t.label}</div></div>
+              <span style={{fontSize:18, fontWeight:700}}>{v}/3</span>
+            </div>
+            <div style={{padding:"20px"}}>
+              {(showHas ? t.strong : t.weak).map((s,i) => (
+                <div key={i} style={{marginBottom:6}}>{showHas?"→":"–"} {s}</div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      {tab==="develop" && (
+        <div>
+          {Object.entries(person.scores).map(([k,v]) => {
+            const t = VIRTUES[k];
+            return (
+              <div key={k} style={{marginBottom:20, background:"#fff", border:`2px solid ${t.border}`, borderRadius:14, overflow:"hidden"}}>
+                <div style={{background:t.bg, padding:"14px 20px", display:"flex", alignItems:"center", gap:12}}>
+                  <span style={{fontSize:28}}>{t.icon}</span>
+                  <div style={{fontSize:18, fontWeight:800, color:t.color, flex:1}}>{t.label}</div>
+                  <span style={{fontSize:14, color:C.textMuted, background:"#fff", padding:"4px 10px", borderRadius:20, fontWeight:700}}>{SCORE_LABELS[v]}</span>
+                </div>
+                <div style={{padding:"16px 20px"}}>
+                  {t.develop.map((step,i) => (
+                    <div key={i} style={{display:"flex", gap:12, marginBottom:10, alignItems:"flex-start"}}>
+                      <span style={{background:C.orange, color:"#fff", borderRadius:"50%", width:22, height:22, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:800, flexShrink:0}}>{i+1}</span>
+                      <span style={{fontSize:14, color:C.text, lineHeight:1.5}}>{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tab==="notes" && (
+        <div style={{background:"#fff", border:`1px solid ${C.border}`, borderRadius:12, padding:24, minHeight:200, whiteSpace:"pre-wrap", fontSize:15}}>
+          {person.notes || "No notes added yet."}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+const BLANK_ATHLETE = { id:"", name:"", role:"", notes:"", scores:{L:1,P:1,S:1,G:1,H:1,Gr:1,J:1}, lastUpdated: null };
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+function App() {
+  const [tab, setTab] = useState("athletes");
+  const [athletes, setAthletes] = useState(() => load("awaygame_athletes_v1", []));
+  const [editing, setEditing] = useState(null);
+  const [viewing, setViewing] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  function saveAthlete(p) {
+    const updated = {...p, id: p.id || uid(), lastUpdated: Date.now()};
+    const next = p.id ? athletes.map(x => x.id === p.id ? updated : x) : [...athletes, updated];
+    setAthletes(next);
+    save("awaygame_athletes_v1", next);
+    setEditing(null);
+  }
+
+  function deleteAthlete(id) {
+    const next = athletes.filter(a => a.id !== id);
+    setAthletes(next);
+    save("awaygame_athletes_v1", next);
+    setDeleteConfirm(null);
+    if (viewing && viewing.id === id) setViewing(null);
+  }
+
+  const teamStats = calculateTeamProgress(athletes);
+
+  return (
+    <div style={{minHeight:"100vh", background:"#f8f9fa"}}>
+      {/* HEADER */}
+      <div style={{background:"#fff", borderBottom:"4px solid #ff8c00", padding:"0 24px", height:76, display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:"0 3px 12px rgba(0,0,0,0.1)"}}>
+        <div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif", fontWeight:900, fontSize:32, letterSpacing:1.5, color:C.orange}}>AWAY GAME</div>
+          <div style={{fontSize:13, color:"#555"}}>Christian Parent’s Playbook</div>
+        </div>
+        <div style={{display:"flex", gap:8}}>
+          <button onClick={()=>setTab("athletes")} style={{padding:"10px 22px", borderRadius:10, background:tab==="athletes"?C.orange:"#fff", color:tab==="athletes"?"#fff":"#333", fontWeight:700, border:"2px solid #ff8c00"}}>👥 My Athletes</button>
+          <button onClick={()=>setTab("playbook")} style={{padding:"10px 22px", borderRadius:10, background:tab==="playbook"?C.orange:"#fff", color:tab==="playbook"?"#fff":"#333", fontWeight:700, border:"2px solid #ff8c00"}}>📖 The Playbook</button>
+        </div>
+      </div>
+
+      {tab === "athletes" && (
+        <div style={{padding:24}}>
+          {/* TEAM PROGRESS DASHBOARD */}
+          {athletes.length > 0 && (
+            <div className="team-card" style={{marginBottom:32}}>
+              <div style={{fontSize:20, fontWeight:800, marginBottom:16, color:C.orange}}>Team Progress Overview</div>
+              <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))", gap:20}}>
+                <div>
+                  <div style={{fontSize:13, color:C.textMuted}}>Team Average Score</div>
+                  <div style={{fontSize:32, fontWeight:800, color:C.orange}}>{teamStats.avgScore}</div>
+                  <div style={{fontSize:13}}>out of 3.0</div>
+                </div>
+                <div>
+                  <div style={{fontSize:13, color:C.textMuted}}>Strong Virtues</div>
+                  <div style={{fontSize:32, fontWeight:800, color: teamStats.strongPercent > 70 ? C.green : C.orange}}>{teamStats.strongPercent}%</div>
+                </div>
+                <div>
+                  <div style={{fontSize:13, color:C.textMuted}}>Athletes Tracked</div>
+                  <div style={{fontSize:32, fontWeight:800}}>{teamStats.totalAthletes}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:28}}>
+            <h1 style={{fontSize:28, fontWeight:800}}>My Athletes</h1>
+            <button onClick={()=>setEditing(BLANK_ATHLETE)} style={{background:C.orange, color:"#fff", border:"none", padding:"12px 28px", borderRadius:12, fontWeight:700}}>＋ Add Athlete</button>
+          </div>
+
+          {athletes.length === 0 ? (
+            <div style={{textAlign:"center", padding:"120px 20px", color:"#666"}}>
+              <div style={{fontSize:80}}>⚽️🏀🏈</div>
+              <div style={{fontSize:24, margin:"20px 0"}}>Start building your team’s character</div>
+              <button onClick={()=>setEditing(BLANK_ATHLETE)} style={{background:C.orange, color:"#fff", padding:"14px 36px", borderRadius:12, fontSize:17, fontWeight:700}}>Add Your First Athlete</button>
+            </div>
+          ) : (
+            <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(310px, 1fr))", gap:20}}>
+              {athletes.map(p => {
+                const combo = getCombo(p.scores);
+                return (
+                  <div key={p.id} style={{background:"#fff", border:`1px solid ${C.border}`, borderRadius:16, padding:22, boxShadow:"0 6px 20px rgba(0,0,0,0.07)", position:"relative"}}>
+                    <button 
+                      onClick={(e)=>{e.stopPropagation(); setDeleteConfirm(p);}} 
+                      className="delete-btn" 
+                      style={{position:"absolute", top:12, right:12}}
+                    >
+                      🗑
+                    </button>
+                    
+                    <div onClick={()=>setViewing(p)} style={{cursor:"pointer"}}>
+                      <div style={{fontSize:22, fontWeight:800, marginBottom:8}}>{p.name}</div>
+                      {p.role && <div style={{color:C.textSub, marginBottom:12}}>{p.role}</div>}
+                      
+                      <div style={{display:"flex", gap:8, flexWrap:"wrap", marginBottom:16}}>
+                        {Object.entries(p.scores).map(([k,v]) => (
+                          <div key={k} style={{background:VIRTUES[k].bg, padding:"6px 10px", borderRadius:8, fontSize:14}}>{VIRTUES[k].icon} {v}</div>
+                        ))}
+                      </div>
+
+                      <div style={{marginBottom:12}}>
+                        <div className="progress-bar">
+                          <div className="progress-fill" style={{width: `${combo.progress}%`, background: combo.progress > 80 ? "linear-gradient(90deg,#00b36b,#34d399)" : combo.progress > 50 ? "linear-gradient(90deg,#ff8c00,#ffaa00)" : "#dc3545"}} />
+                        </div>
+                      </div>
+
+                      <div style={{fontSize:13, color:C.textMuted}}>Last updated: {p.lastUpdated ? new Date(p.lastUpdated).toLocaleDateString() : "Never"}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "playbook" && (
+        <div style={{padding:24, maxWidth:820, margin:"0 auto"}}>
+          <h2 style={{color:C.orange, marginBottom:8}}>The Seven Virtues</h2>
+          <p style={{color:C.textSub, marginBottom:32}}>Fruit of the Spirit applied to youth sports.</p>
+          {Object.values(VIRTUES).map(t => (
+            <div key={t.key} style={{marginBottom:24, background:"#fff", border:`1px solid ${t.border}`, borderRadius:16, padding:24}}>
+              <div style={{display:"flex", alignItems:"center", gap:16}}>
+                <span style={{fontSize:48}}>{t.icon}</span>
+                <div>
+                  <div style={{fontSize:22, fontWeight:800, color:t.color}}>{t.label}</div>
+                  <div style={{color:C.textSub}}>"{t.tagline}"</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editing && <EditModal person={editing} onSave={saveAthlete} onClose={()=>setEditing(null)} />}
+      {viewing && <PersonDetail person={viewing} onClose={()=>setViewing(null)} onEdit={p=>{setViewing(null); setEditing(p);}} />}
+      {deleteConfirm && <ConfirmDelete name={deleteConfirm.name} onConfirm={()=>deleteAthlete(deleteConfirm.id)} onCancel={()=>setDeleteConfirm(null)} />}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>
