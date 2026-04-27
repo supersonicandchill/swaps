@@ -1,417 +1,791 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
-<title>Away Game — Christian Parent’s Playbook</title>
-<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FD SwapCheck – Apparatus Equipment Swap Checklist Builder</title>
+<script src="https://cdn.tailwindcss.com"></script>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: #f8f9fa; font-family: 'DM Sans', system-ui, sans-serif; color: #1a1a1a; line-height: 1.6; }
-button { cursor: pointer; }
-.progress-bar { height: 10px; background: #e9ecef; border-radius: 9999px; overflow: hidden; }
-.progress-fill { height: 100%; transition: width 0.5s ease; }
-.team-card { background: #fff; border: 1px solid #dee2e6; border-radius: 16px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); }
-.delete-btn { background: #fee2e2; color: #ef4444; border: none; width: 32px; height: 32px; border-radius: 8px; font-size: 18px; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  *,*::before,*::after{font-family:'Inter',system-ui,sans-serif;box-sizing:border-box;}
+  .tab-active{border-bottom:3px solid #dc2626;color:#f87171!important;}
+  .item-from{border-left:4px solid #ef4444;}
+  .item-to{border-left:4px solid #3b82f6;}
+  .col-from-bar{background:linear-gradient(135deg,#7f1d1d 0%,#991b1b 100%);}
+  .col-to-bar{background:linear-gradient(135deg,#1e3a5f 0%,#1d4ed8 100%);}
+  .item-card{transition:all 0.15s ease;}
+  .toast{animation:toastIn 0.25s ease;}
+  @keyframes toastIn{from{transform:translateY(12px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  ::-webkit-scrollbar{width:5px;height:5px;}
+  ::-webkit-scrollbar-track{background:#111827;}
+  ::-webkit-scrollbar-thumb{background:#374151;border-radius:4px;}
+  select option{background:#1f2937;color:#f3f4f6;}
+  .col-empty-box{border:2px dashed #374151;border-radius:12px;}
+  @media print{
+    .no-print{display:none!important;}
+    #printView{display:block!important;}
+    #app{display:none!important;}
+    body{background:white!important;}
+  }
+  #printView{display:none;}
 </style>
 </head>
-<body>
-<div id="root"></div>
-<script type="text/babel" data-presets="react">
-const { useState } = React;
+<body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">
 
-// ─── STORAGE ──────────────────────────────────────────────────────────────────
-function load(key, fb) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fb; } catch { return fb; } }
-function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
-let _c = Date.now();
-function uid() { return "x" + (++_c).toString(36); }
+<!-- PRINT -->
+<div id="printView" class="p-8 bg-white text-black"><div id="printContent"></div></div>
 
-// ─── COLORS ───────────────────────────────────────────────────────────────────
-const C = {
-  bg0: "#f8f9fa", bg1: "#ffffff", bg2: "#f1f3f5", bg3: "#e9ecef",
-  border: "#dee2e6", borderHi: "#ff8c00",
-  text: "#1a1a1a", textSub: "#495057", textMuted: "#6c757d",
-  orange: "#ff8c00", green: "#00b36b"
+<!-- TOASTS -->
+<div id="toastBox" class="fixed bottom-20 right-4 z-50 flex flex-col gap-2 no-print pointer-events-none"></div>
+
+<!-- CONFIRM MODAL -->
+<div id="confirmModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm no-print">
+  <div class="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+    <div class="flex items-center gap-3 mb-2"><span class="text-2xl">⚠️</span><h3 class="text-lg font-bold text-white" id="confTitle">Confirm</h3></div>
+    <p class="text-gray-300 text-sm mb-5 pl-9" id="confMsg">This cannot be undone.</p>
+    <div class="flex gap-3 justify-end">
+      <button onclick="closeConfirm()" class="px-4 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-sm font-semibold transition">Cancel</button>
+      <button id="confOk" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white transition">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- LIBRARY MODAL -->
+<div id="libModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm no-print">
+  <div class="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl flex flex-col" style="max-height:88vh">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-lg font-bold text-white">📦 Add from Equipment Library</h3>
+      <button onclick="closeLibModal()" class="text-gray-400 hover:text-white w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-700 text-xl transition">&times;</button>
+    </div>
+    <input id="libSearch" type="text" placeholder="Search equipment…" oninput="renderLibModal()"
+      class="mb-3 px-3 py-2 rounded-xl bg-gray-900 border border-gray-700 text-sm text-white focus:outline-none focus:border-red-500 w-full">
+    <div id="libList" class="overflow-y-auto flex-1 flex flex-col gap-1 pr-1"></div>
+    <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-700">
+      <span class="text-xs text-gray-400 font-semibold" id="libSelCount">0 selected</span>
+      <div class="flex gap-2">
+        <button onclick="closeLibModal()" class="px-4 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-sm font-semibold transition">Cancel</button>
+        <button onclick="confirmLibAdd()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white transition">Add Selected</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div id="importModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm no-print">
+  <div class="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+    <h3 class="text-lg font-bold text-white mb-2">📥 Import Data</h3>
+    <p class="text-gray-400 text-sm mb-4">How would you like to import?</p>
+    <div class="flex flex-col gap-3">
+      <button onclick="doImport('replace')" class="py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white transition">Replace All (overwrites everything)</button>
+      <button onclick="doImport('merge')"   class="py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-sm font-bold text-white transition">Merge (adds to existing data)</button>
+      <button onclick="closeImportModal()"  class="py-2.5 rounded-xl bg-gray-700 hover:bg-gray-600 text-sm font-semibold transition">Cancel</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="importFile" accept=".json" class="hidden" onchange="handleImportFile(event)">
+
+<!-- APP -->
+<div id="app" class="flex flex-col min-h-screen no-print">
+
+  <!-- NAV -->
+  <nav class="bg-gray-900 border-b border-gray-800 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4">
+      <div class="flex items-center justify-between h-14 gap-2">
+        <div class="flex items-center gap-2 shrink-0">
+          <span class="text-2xl">🔥</span>
+          <span class="font-black text-lg text-white tracking-tight">FD <span class="text-red-500">SwapCheck</span></span>
+        </div>
+        <button onclick="toggleMobileMenu()" class="md:hidden text-gray-400 hover:text-white p-1 rounded">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="hidden md:flex items-center flex-1 justify-center gap-0">
+          <button onclick="showTab('dashboard')"  id="tab-dashboard"   class="tab-btn px-3 py-4 text-sm font-medium text-gray-400 hover:text-white transition">Dashboard</button>
+          <button onclick="showTab('apparatus')"  id="tab-apparatus"   class="tab-btn px-3 py-4 text-sm font-medium text-gray-400 hover:text-white transition">Apparatus</button>
+          <button onclick="showTab('library')"    id="tab-library"     class="tab-btn px-3 py-4 text-sm font-medium text-gray-400 hover:text-white transition">Equipment Library</button>
+          <button onclick="showTab('swaptypes')"  id="tab-swaptypes"   class="tab-btn px-3 py-4 text-sm font-medium text-gray-400 hover:text-white transition">Swap Types</button>
+          <button onclick="showTab('checklists')" id="tab-checklists"  class="tab-btn px-3 py-4 text-sm font-medium text-gray-400 hover:text-white transition">My Checklists</button>
+          <button onclick="startNew()"            id="tab-editor"      class="tab-btn px-3 py-4 text-sm font-semibold text-orange-400 hover:text-orange-300 transition flex items-center gap-1"><span class="font-black text-base">+</span> New Checklist</button>
+        </div>
+        <div class="hidden md:flex items-center gap-2 shrink-0">
+          <button onclick="exportAll()"     class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-300 border border-gray-700 transition">📤 Export</button>
+          <button onclick="triggerImport()" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-300 border border-gray-700 transition">📥 Import</button>
+        </div>
+      </div>
+      <div id="mobileMenu" class="hidden md:hidden pb-3 border-t border-gray-800 pt-2 flex flex-col gap-1">
+        <button onclick="showTab('dashboard');closeMobile()"  class="text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg">📊 Dashboard</button>
+        <button onclick="showTab('apparatus');closeMobile()"  class="text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg">🚒 Apparatus</button>
+        <button onclick="showTab('library');closeMobile()"    class="text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg">📦 Equipment Library</button>
+        <button onclick="showTab('swaptypes');closeMobile()"  class="text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg">🔄 Swap Types</button>
+        <button onclick="showTab('checklists');closeMobile()" class="text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-lg">📋 My Checklists</button>
+        <button onclick="startNew();closeMobile()"            class="text-left px-3 py-2 text-sm text-orange-400 font-semibold hover:bg-gray-800 rounded-lg">+ New Checklist</button>
+        <div class="flex gap-2 px-3 pt-2">
+          <button onclick="exportAll()"     class="flex-1 py-2 rounded-lg bg-gray-800 text-xs font-semibold text-gray-300 border border-gray-700">📤 Export</button>
+          <button onclick="triggerImport()" class="flex-1 py-2 rounded-lg bg-gray-800 text-xs font-semibold text-gray-300 border border-gray-700">📥 Import</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
+
+    <!-- DASHBOARD -->
+    <div id="view-dashboard" class="hidden">
+      <div class="flex items-center justify-between mb-6">
+        <div><h1 class="text-2xl font-black text-white">Dashboard</h1><p class="text-gray-500 text-sm mt-0.5">Overview of your swap checklists</p></div>
+        <button onclick="startNew()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white transition">+ New Checklist</button>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-gray-900 rounded-2xl p-5 border border-gray-800"><div class="text-3xl font-black text-red-500" id="s-cl">0</div><div class="text-xs text-gray-500 mt-1 font-medium uppercase tracking-wide">Checklists</div></div>
+        <div class="bg-gray-900 rounded-2xl p-5 border border-gray-800"><div class="text-3xl font-black text-orange-400" id="s-ap">0</div><div class="text-xs text-gray-500 mt-1 font-medium uppercase tracking-wide">Apparatus</div></div>
+        <div class="bg-gray-900 rounded-2xl p-5 border border-gray-800"><div class="text-3xl font-black text-yellow-400" id="s-lb">0</div><div class="text-xs text-gray-500 mt-1 font-medium uppercase tracking-wide">Library Items</div></div>
+        <div class="bg-gray-900 rounded-2xl p-5 border border-gray-800"><div class="text-3xl font-black text-green-400" id="s-av">0%</div><div class="text-xs text-gray-500 mt-1 font-medium uppercase tracking-wide">Avg Completion</div></div>
+      </div>
+      <h2 class="text-xs font-bold text-gray-600 uppercase tracking-widest mb-3">Recent Checklists</h2>
+      <div id="dashGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+      <div id="dashEmpty" class="hidden text-center py-20 text-gray-600">
+        <div class="text-5xl mb-3">📋</div>
+        <div class="font-bold text-lg text-gray-500">No checklists yet</div>
+        <div class="text-sm mt-1">Create your first swap checklist to get started</div>
+        <button onclick="startNew()" class="mt-5 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white transition">+ New Checklist</button>
+      </div>
+    </div>
+
+    <!-- APPARATUS -->
+    <div id="view-apparatus" class="hidden">
+      <div class="flex items-center justify-between mb-6">
+        <div><h1 class="text-2xl font-black text-white">🚒 Apparatus</h1><p class="text-gray-500 text-sm mt-0.5">Manage your department's apparatus list</p></div>
+        <button onclick="showAddAp()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white transition">+ Add Apparatus</button>
+      </div>
+      <div id="addApForm" class="hidden bg-gray-900 rounded-2xl p-4 mb-4 border border-gray-700 flex gap-2">
+        <input id="newApName" type="text" placeholder="e.g. Engine 4" maxlength="60"
+          class="flex-1 px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 text-sm text-white focus:outline-none focus:border-red-500"
+          onkeydown="if(event.key==='Enter')addAp()">
+        <button onclick="addAp()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white transition">Add</button>
+        <button onclick="hideAddAp()" class="px-3 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-sm font-semibold transition">Cancel</button>
+      </div>
+      <div id="apList" class="flex flex-col gap-2"></div>
+      <div id="apEmpty" class="hidden text-center py-12 text-gray-600"><div class="text-4xl mb-2">🚒</div><div class="text-sm">No apparatus added yet</div></div>
+    </div>
+
+    <!-- LIBRARY -->
+    <div id="view-library" class="hidden">
+      <div class="flex items-center justify-between mb-6">
+        <div><h1 class="text-2xl font-black text-white">📦 Equipment Library</h1><p class="text-gray-500 text-sm mt-0.5">Master list of reusable equipment items</p></div>
+        <button onclick="showAddLib()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white transition">+ Add Item</button>
+      </div>
+      <input id="libSearchMain" type="text" placeholder="🔍  Search library…" oninput="renderLibList()"
+        class="mb-4 w-full px-4 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-sm text-white focus:outline-none focus:border-red-500">
+      <div id="addLibForm" class="hidden bg-gray-900 rounded-2xl p-4 mb-4 border border-gray-700 flex gap-2">
+        <input id="newLibName" type="text" placeholder="Equipment name…" maxlength="80"
+          class="flex-1 px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 text-sm text-white focus:outline-none focus:border-red-500"
+          onkeydown="if(event.key==='Enter')addLib()">
+        <button onclick="addLib()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white transition">Add</button>
+        <button onclick="hideAddLib()" class="px-3 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-sm font-semibold transition">Cancel</button>
+      </div>
+      <div id="libMainList" class="flex flex-col gap-2"></div>
+    </div>
+
+    <!-- SWAP TYPES -->
+    <div id="view-swaptypes" class="hidden">
+      <div class="flex items-center justify-between mb-6">
+        <div><h1 class="text-2xl font-black text-white">🔄 Swap Types</h1><p class="text-gray-500 text-sm mt-0.5">Define and manage swap categories</p></div>
+        <button onclick="showAddST()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white transition">+ Add Type</button>
+      </div>
+      <div id="addSTForm" class="hidden bg-gray-900 rounded-2xl p-4 mb-4 border border-gray-700 flex gap-2">
+        <input id="newSTName" type="text" placeholder="e.g. Partial Swap" maxlength="60"
+          class="flex-1 px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 text-sm text-white focus:outline-none focus:border-red-500"
+          onkeydown="if(event.key==='Enter')addST()">
+        <button onclick="addST()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white transition">Add</button>
+        <button onclick="hideAddST()" class="px-3 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-sm font-semibold transition">Cancel</button>
+      </div>
+      <div id="stList" class="flex flex-col gap-2"></div>
+    </div>
+
+    <!-- MY CHECKLISTS -->
+    <div id="view-checklists" class="hidden">
+      <div class="flex items-center justify-between mb-6">
+        <div><h1 class="text-2xl font-black text-white">📋 My Checklists</h1><p class="text-gray-500 text-sm mt-0.5">All saved swap checklists</p></div>
+        <button onclick="startNew()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-bold text-white transition">+ New Checklist</button>
+      </div>
+      <div class="mb-4 flex gap-2 flex-wrap">
+        <input id="clSearch" type="text" placeholder="🔍  Filter checklists…" oninput="renderCLList()"
+          class="flex-1 min-w-40 px-4 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-sm text-white focus:outline-none focus:border-red-500">
+        <select id="clFilterType" onchange="renderCLList()"
+          class="px-3 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-sm text-white focus:outline-none focus:border-red-500">
+          <option value="">All Types</option>
+        </select>
+      </div>
+      <div id="clList" class="flex flex-col gap-3"></div>
+      <div id="clEmpty" class="hidden text-center py-12 text-gray-600"><div class="text-4xl mb-2">📋</div><div class="text-sm">No checklists found</div></div>
+    </div>
+
+    <!-- EDITOR -->
+    <div id="view-editor" class="hidden">
+      <!-- Header -->
+      <div class="flex items-center gap-3 mb-5 flex-wrap">
+        <button onclick="showTab('checklists')" class="text-gray-500 hover:text-white text-xl shrink-0 transition" title="Back">←</button>
+        <input id="edTitle" type="text" placeholder="Checklist title…" maxlength="100" oninput="autoSave()"
+          class="flex-1 min-w-40 bg-transparent text-xl font-black text-white placeholder-gray-700 focus:outline-none border-b border-gray-800 focus:border-red-500 pb-0.5 transition">
+        <div class="flex gap-2 flex-wrap shrink-0">
+          <button onclick="printCL()"        class="px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-xs font-semibold border border-gray-700 transition">🖨️ Print</button>
+          <button onclick="exportSingle()"   class="px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-xs font-semibold border border-gray-700 transition">📤 Export</button>
+          <button onclick="resetSwap()"      class="px-3 py-1.5 rounded-xl bg-orange-900/50 hover:bg-orange-800/60 text-xs font-semibold border border-orange-800 text-orange-300 transition">↺ Reset</button>
+          <button onclick="deleteCurrent()"  class="px-3 py-1.5 rounded-xl bg-red-900/40 hover:bg-red-800/60 text-xs font-semibold border border-red-800 text-red-300 transition">🗑️ Delete</button>
+        </div>
+      </div>
+
+      <!-- Metadata -->
+      <div class="bg-gray-900 rounded-2xl p-4 mb-5 border border-gray-800 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">From Apparatus</label>
+          <select id="edFrom" onchange="onFromChange()" class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 text-sm text-white focus:outline-none focus:border-red-500"></select>
+          <input id="edFromCustom" type="text" placeholder="Enter name…" maxlength="60" oninput="autoSave()"
+            class="hidden mt-2 w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 text-sm text-white focus:outline-none focus:border-red-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">To Apparatus</label>
+          <select id="edTo" onchange="onToChange()" class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 text-sm text-white focus:outline-none focus:border-red-500"></select>
+          <input id="edToCustom" type="text" placeholder="Enter name…" maxlength="60" oninput="autoSave()"
+            class="hidden mt-2 w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 text-sm text-white focus:outline-none focus:border-red-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Swap Type</label>
+          <select id="edSwapType" onchange="autoSave()" class="w-full px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 text-sm text-white focus:outline-none focus:border-red-500"></select>
+        </div>
+      </div>
+
+      <!-- Progress -->
+      <div class="bg-gray-900 rounded-2xl p-4 mb-5 border border-gray-800">
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-wide">Swap Progress</span>
+          <span class="text-sm font-bold text-white" id="edProgLabel">0 of 0 swapped</span>
+        </div>
+        <div class="w-full bg-gray-800 rounded-full h-3 overflow-hidden">
+          <div id="edProgBar" class="h-3 rounded-full transition-all duration-500 bg-gradient-to-r from-red-600 via-orange-500 to-yellow-400" style="width:0%"></div>
+        </div>
+        <div class="mt-1 text-right text-xs font-bold text-gray-500" id="edProgPct">0%</div>
+      </div>
+
+      <!-- TWO-COLUMN BOARD -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+
+        <!-- FROM column -->
+        <div class="rounded-2xl overflow-hidden border border-gray-800 flex flex-col">
+          <div class="col-from-bar px-4 py-3 flex items-center justify-between">
+            <div>
+              <div class="text-xs text-red-300 font-bold uppercase tracking-widest">From</div>
+              <div class="text-base font-black text-white leading-tight" id="colFromLabel">—</div>
+            </div>
+            <div class="text-right">
+              <div class="text-2xl font-black text-red-200" id="colFromCount">0</div>
+              <div class="text-xs text-red-400">items here</div>
+            </div>
+          </div>
+          <div class="bg-red-950/30 border-b border-red-900/30 px-4 py-1.5">
+            <span class="text-xs text-red-300/60 font-medium">Click an item to move it → to the TO apparatus</span>
+          </div>
+          <div class="bg-gray-900 flex-1 p-3 flex flex-col gap-2" id="colFromItems"></div>
+          <div id="colFromEmpty" class="hidden bg-gray-900 p-5">
+            <div class="col-empty-box p-6 text-center text-gray-600">
+              <div class="text-3xl mb-1">✅</div>
+              <div class="text-sm font-semibold">All items swapped!</div>
+              <div class="text-xs mt-0.5 text-gray-700">Click items on the right to move them back</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TO column -->
+        <div class="rounded-2xl overflow-hidden border border-gray-800 flex flex-col">
+          <div class="col-to-bar px-4 py-3 flex items-center justify-between">
+            <div>
+              <div class="text-xs text-blue-300 font-bold uppercase tracking-widest">To</div>
+              <div class="text-base font-black text-white leading-tight" id="colToLabel">—</div>
+            </div>
+            <div class="text-right">
+              <div class="text-2xl font-black text-blue-200" id="colToCount">0</div>
+              <div class="text-xs text-blue-400">items here</div>
+            </div>
+          </div>
+          <div class="bg-blue-950/30 border-b border-blue-900/30 px-4 py-1.5">
+            <span class="text-xs text-blue-300/60 font-medium">Click an item to move it ← back to the FROM apparatus</span>
+          </div>
+          <div class="bg-gray-900 flex-1 p-3 flex flex-col gap-2" id="colToItems"></div>
+          <div id="colToEmpty" class="hidden bg-gray-900 p-5">
+            <div class="col-empty-box p-6 text-center text-gray-600">
+              <div class="text-3xl mb-1">📭</div>
+              <div class="text-sm font-semibold">Nothing swapped yet</div>
+              <div class="text-xs mt-0.5 text-gray-700">Click items on the left to move them here</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add items -->
+      <div class="bg-gray-900 rounded-2xl border border-gray-800 p-4">
+        <div class="flex items-center gap-3 flex-wrap mb-3">
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-wide">Add Equipment</span>
+          <button onclick="openLibModal()"    class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-xs font-bold text-white transition">📦 From Library</button>
+          <button onclick="toggleCustomForm()" class="px-4 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-xs font-semibold text-white transition">✏️ Custom Item</button>
+        </div>
+        <div id="customForm" class="hidden flex gap-2 mt-1">
+          <input id="customInput" type="text" placeholder="Equipment name…" maxlength="100"
+            class="flex-1 px-3 py-2 rounded-xl bg-gray-800 border border-gray-700 text-sm text-white focus:outline-none focus:border-orange-500"
+            onkeydown="if(event.key==='Enter')addCustom();if(event.key==='Escape')hideCustomForm()">
+          <button onclick="addCustom()" class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-xs font-bold text-white transition">Add</button>
+          <button onclick="hideCustomForm()" class="px-3 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-xs font-semibold transition">✕</button>
+        </div>
+        <p class="text-xs text-gray-700 mt-2">New items always start in the <span class="text-red-400 font-semibold">From</span> column. Click any item card to move it. Click again to move it back.</p>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="bg-gray-900 border-t border-gray-800 px-4 py-3 text-center text-xs text-gray-600">
+    ⚠️ All data is saved locally in your browser's localStorage. Clearing cookies, cache, or browser data will delete everything. Always use the Export button to save a backup JSON file.
+  </footer>
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────
+let store={apparatus:[],library:[],swapTypes:[],checklists:[]};
+const DEFS={
+  apparatus:["Engine 1","Engine 2","Truck 1","Rescue 1","Medic 1","Utility 1"],
+  library:["SCBA Unit","SCBA Spare Cylinder","Medical Bag (ALS)","Medical Bag (BLS)",
+    "Nozzle 1¾\"","Nozzle 2½\"","1¾\" Hose Bundle (100ft)","2½\" Hose Bundle (100ft)",
+    "Halligan Bar","Flathead Axe","Thermal Imager","Hydraulic Rescue Tool",
+    "Chain Saw","Positive Pressure Fan","Defibrillator/AED",
+    "Stokes Basket","Pike Pole","Attic Ladder","Extension Cord 100ft","Pre-Connect Hose Pack"],
+  swapTypes:["Hard Swap","Soft Swap","Partial Swap"],
+  checklists:[{id:'s1',title:'Swap from Engine 1 to Engine 2',fromApparatus:'Engine 1',toApparatus:'Engine 2',
+    swapType:'Hard Swap',
+    items:[{id:'i1',name:'SCBA Unit',swapped:false},{id:'i2',name:'Medical Bag (ALS)',swapped:true},
+           {id:'i3',name:'Nozzle 1¾"',swapped:false},{id:'i4',name:'1¾" Hose Bundle (100ft)',swapped:false},
+           {id:'i5',name:'Halligan Bar',swapped:true},{id:'i6',name:'Thermal Imager',swapped:false}],
+    createdAt:new Date().toISOString(),lastUpdated:new Date().toISOString()}]
 };
+function loadStore(){try{const s=localStorage.getItem('fdsc2');store=s?JSON.parse(s):JSON.parse(JSON.stringify(DEFS));}catch{store=JSON.parse(JSON.stringify(DEFS));}['apparatus','library','swapTypes','checklists'].forEach(k=>{if(!store[k])store[k]=[];});}
+function save(){localStorage.setItem('fdsc2',JSON.stringify(store));}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 
-// ─── VIRTUES (Complete) ───────────────────────────────────────────────────────
-const VIRTUES = {
-  L: { key:"L", label:"Love", icon:"❤️", tagline:"Others-first in a me-first culture", color:"#ff4d4d", bg:"#fff0f0", border:"#ff8c00",
-       scoreMeaning: "0=Never • 1=Rarely • 2=Sometimes • 3=Consistently puts others first",
-       strong: ["Celebrates teammates' success", "Shows genuine kindness", "Puts team above self"],
-       weak:   ["Selfish on and off the field", "Dismisses or ignores teammates", "Only cheers for own highlights"],
-       develop: ["After each game, name one teammate who helped you win", "Do one act of encouragement before you leave the field", "Pray: 'Lord, help me love my teammates the way You love me'"] },
-  P: { key:"P", label:"Peace", icon:"☮️", tagline:"Calm anchored in Christ", color:"#00b36b", bg:"#f0fff4", border:"#ff8c00",
-       scoreMeaning: "0=Constant anxiety • 1=Occasional calm • 2=Usually calm • 3=Peace that guards the heart",
-       strong: ["Stays composed under pressure", "Calms teammates in tense moments", "Bounces back quickly from mistakes"],
-       weak:   ["Anxious or panicked when things go wrong", "Spreads tension to teammates", "Dwells on errors during play"],
-       develop: ["Practice three slow breaths before any big moment", "Write down one worry this week and give it to God in prayer", "Memorize Phil. 4:7 — let it anchor your pregame routine"] },
-  S: { key:"S", label:"Self-Control", icon:"🛡️", tagline:"Responding instead of reacting", color:"#0077cc", bg:"#f0f8ff", border:"#ff8c00",
-       scoreMeaning: "0=Frequent outbursts • 1=Improving • 2=Usually controlled • 3=Strong self-discipline",
-       strong: ["Responds to bad calls without blowing up", "Keeps emotions in check under provocation", "Leads by example in discipline"],
-       weak:   ["Frequent outbursts or meltdowns", "Argues with officials or coaches", "Lets frustration hurt performance"],
-       develop: ["Identify your #1 trigger — name it, then make a plan for it", "After a bad call, count to 5 before you react", "Ask a trusted teammate to hold you accountable this week"] },
-  G: { key:"G", label:"Gentleness", icon:"🌿", tagline:"Strength under control", color:"#9c4dff", bg:"#f8f0ff", border:"#ff8c00",
-       scoreMeaning: "0=Often harsh • 1=Sometimes gentle • 2=Usually gentle • 3=Strength under control",
-       strong: ["Encourages struggling teammates", "Competes hard without being cruel", "Uses words that build up, not tear down"],
-       weak:   ["Often harsh or cutting with words", "Intimidates or belittles others", "Confuses meanness with toughness"],
-       develop: ["Before criticizing a teammate, ask: 'Is this kind AND true?'", "Find one struggling player this week and intentionally encourage them", "Journal: where did strength AND gentleness show up together today?"] },
-  H: { key:"H", label:"Humility", icon:"🙏", tagline:"Playing from identity, not for identity", color:"#ff8c00", bg:"#fff8f0", border:"#ff8c00",
-       scoreMeaning: "0=Very prideful • 1=Occasional humility • 2=Growing humility • 3=Consistently humble",
-       strong: ["Credits teammates and coaches for success", "Accepts coaching without defensiveness", "Secure enough to celebrate others"],
-       weak:   ["Takes credit, deflects blame", "Gets defensive when corrected", "Needs to be the star"],
-       develop: ["After your next win, publicly credit two specific teammates", "When corrected by a coach, respond: 'Thank you, I'll work on that'", "Ask yourself: 'Am I playing TO prove something or FROM knowing who I am?'"] },
-  Gr: { key:"Gr", label:"Gratitude", icon:"🙌", tagline:"Thankful in all circumstances", color:"#ffaa00", bg:"#fffdf0", border:"#ff8c00",
-       scoreMeaning: "0=Very entitled • 1=Occasional thanks • 2=Usually grateful • 3=Thankful in all circumstances",
-       strong: ["Thanks coaches, officials, and opponents", "Grateful for the opportunity to compete", "Positive attitude win or lose"],
-       weak:   ["Entitled attitude about playing time or roles", "Rarely thanks others", "Complains about conditions, calls, or teammates"],
-       develop: ["Start every practice with one thing you're grateful for about this team", "Write a one-line thank-you to a coach or teammate this week", "After a loss, find three genuine things to be thankful for before you leave"] },
-  J: { key:"J", label:"Joy", icon:"🎉", tagline:"Delight that outlasts the score", color:"#ff6600", bg:"#fff4f0", border:"#ff8c00",
-       scoreMeaning: "0=Joy is gone • 1=Rare joy • 2=Usually joyful • 3=Consistent delight",
-       strong: ["Genuine enjoyment of the game", "Joy that doesn't depend on the scoreboard", "Lifts the energy of those around them"],
-       weak:   ["Only happy when winning", "Drains team energy with negativity", "Has lost the love of the game"],
-       develop: ["Recall why you first fell in love with this sport — write it down", "Find one moment in each practice to just enjoy the game", "Remind yourself: the scoreboard is temporary, but who you're becoming is not"] }
-};
+// ── NAV ───────────────────────────────────────────────────────
+let currentTab='dashboard',editId=null,libSel=[];
+const TABS=['dashboard','apparatus','library','swaptypes','checklists','editor'];
+function g(id){return document.getElementById(id);}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function fmtDate(iso){try{return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch{return '';}}
 
-const SCORE_LABELS = ["Missing", "Emerging", "Developing", "Strong"];
+function showTab(t){
+  TABS.forEach(x=>{g('view-'+x).classList.add('hidden');const b=g('tab-'+x);if(b)b.classList.remove('tab-active');});
+  g('view-'+t).classList.remove('hidden');
+  const ab=g('tab-'+t);if(ab)ab.classList.add('tab-active');
+  currentTab=t;render(t);
+}
+function render(t){
+  if(t==='dashboard')renderDash();
+  if(t==='apparatus')renderAp();
+  if(t==='library')renderLibList();
+  if(t==='swaptypes')renderST();
+  if(t==='checklists')renderCLList();
+  if(t==='editor')renderEditor();
+}
+function toggleMobileMenu(){g('mobileMenu').classList.toggle('hidden');}
+function closeMobile(){g('mobileMenu').classList.add('hidden');}
+function startNew(){editId=null;showTab('editor');}
+function openCL(id){editId=id;showTab('editor');}
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-function getCombo(scores) {
-  const strong = Object.values(scores).filter(v => v === 3).length;
-  const developing = Object.values(scores).filter(v => v >= 2).length;
-  const avg = (Object.values(scores).reduce((a,b) => a + b, 0) / 7).toFixed(1);
-
-  if (strong >= 5) return { label: "Kingdom Competitor", icon: "🏆", desc: `Avg ${avg}/3`, color: C.orange, progress: 95 };
-  if (developing >= 6) return { label: "Strong Disciple", icon: "🌟", desc: `Avg ${avg}/3`, color: C.green, progress: 85 };
-  return { label: "Developing Disciple", icon: "🌱", desc: `Avg ${avg}/3`, color: "#fd7e14", progress: Math.round(developing / 7 * 100) };
+// ── DASHBOARD ─────────────────────────────────────────────────
+function renderDash(){
+  g('s-cl').textContent=store.checklists.length;
+  g('s-ap').textContent=store.apparatus.length;
+  g('s-lb').textContent=store.library.length;
+  let sum=0;store.checklists.forEach(c=>{sum+=c.items.length?c.items.filter(i=>i.swapped).length/c.items.length*100:0;});
+  g('s-av').textContent=store.checklists.length?Math.round(sum/store.checklists.length)+'%':'0%';
+  const grid=g('dashGrid'),emp=g('dashEmpty');
+  const sorted=[...store.checklists].sort((a,b)=>new Date(b.lastUpdated)-new Date(a.lastUpdated));
+  if(!sorted.length){grid.innerHTML='';emp.classList.remove('hidden');return;}
+  emp.classList.add('hidden');
+  grid.innerHTML=sorted.slice(0,9).map(c=>{
+    const sw=c.items.filter(i=>i.swapped).length,tot=c.items.length,pct=tot?Math.round(sw/tot*100):0;
+    const bar=pct===100?'bg-green-500':'bg-gradient-to-r from-red-600 to-orange-400';
+    return `<div onclick="openCL('${c.id}')" class="bg-gray-900 rounded-2xl p-5 border border-gray-800 hover:border-red-700 cursor-pointer transition group">
+      <div class="flex justify-between items-start mb-1.5">
+        <h3 class="font-bold text-white text-sm group-hover:text-red-400 transition flex-1 pr-2 leading-snug">${esc(c.title)}</h3>
+        <span class="text-xs font-bold text-orange-400 whitespace-nowrap">${esc(c.swapType)}</span>
+      </div>
+      <div class="text-xs text-gray-500 mb-3 flex items-center gap-1.5">
+        <span class="text-red-400 font-semibold">${esc(c.fromApparatus)}</span><span>→</span><span class="text-blue-400 font-semibold">${esc(c.toApparatus)}</span>
+      </div>
+      <div class="flex justify-between text-xs text-gray-500 mb-2"><span>${sw}/${tot} swapped</span><span class="${pct===100?'text-green-400 font-bold':''}">${pct}%</span></div>
+      <div class="w-full bg-gray-800 rounded-full h-2"><div class="${bar} h-2 rounded-full" style="width:${pct}%"></div></div>
+      <div class="text-xs text-gray-700 mt-2">${fmtDate(c.lastUpdated)}</div>
+    </div>`;
+  }).join('');
 }
 
-function calculateTeamProgress(athletes) {
-  if (athletes.length === 0) return { avgScore: "0.0", strongPercent: 0, totalAthletes: 0 };
-  let totalScore = 0, totalStrong = 0;
-  const totalVirtues = athletes.length * 7;
+// ── APPARATUS ─────────────────────────────────────────────────
+function renderAp(){
+  const list=g('apList'),emp=g('apEmpty');
+  if(!store.apparatus.length){list.innerHTML='';emp.classList.remove('hidden');return;}
+  emp.classList.add('hidden');
+  list.innerHTML=store.apparatus.map((a,i)=>`
+    <div class="flex items-center gap-3 bg-gray-900 rounded-2xl px-5 py-3.5 border border-gray-800 hover:border-gray-700 group">
+      <span class="flex-1 text-sm font-semibold text-white" id="an${i}">${esc(a)}</span>
+      <input id="ae${i}" type="text" value="${esc(a)}" maxlength="60"
+        class="hidden flex-1 px-2 py-1 rounded-xl bg-gray-800 border border-gray-600 text-sm text-white focus:outline-none focus:border-red-500"
+        onkeydown="if(event.key==='Enter')saveAp(${i});if(event.key==='Escape')cancelAp(${i})">
+      <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+        <button onclick="editAp(${i})"   id="aeb${i}" class="text-gray-500 hover:text-orange-400 p-1.5 rounded-lg hover:bg-gray-800 transition">✏️</button>
+        <button onclick="saveAp(${i})"   id="asb${i}" class="hidden text-gray-500 hover:text-green-400 p-1.5 rounded-lg hover:bg-gray-800 transition">✅</button>
+        <button onclick="deleteAp(${i})" class="text-gray-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-gray-800 transition">🗑️</button>
+      </div>
+    </div>`).join('');
+}
+function showAddAp(){g('addApForm').classList.remove('hidden');g('newApName').focus();}
+function hideAddAp(){g('addApForm').classList.add('hidden');g('newApName').value='';}
+function addAp(){const v=g('newApName').value.trim();if(!v)return;store.apparatus.push(v);save();hideAddAp();renderAp();toast('Apparatus added: '+v);}
+function editAp(i){g('an'+i).classList.add('hidden');g('ae'+i).classList.remove('hidden');g('aeb'+i).classList.add('hidden');g('asb'+i).classList.remove('hidden');g('ae'+i).focus();}
+function cancelAp(i){g('an'+i).classList.remove('hidden');g('ae'+i).classList.add('hidden');g('aeb'+i).classList.remove('hidden');g('asb'+i).classList.add('hidden');}
+function saveAp(i){const v=g('ae'+i).value.trim();if(!v)return;store.apparatus[i]=v;save();renderAp();toast('Updated');}
+function deleteAp(i){confirm2('Delete Apparatus',`Delete "${store.apparatus[i]}"?`,()=>{store.apparatus.splice(i,1);save();renderAp();toast('Deleted','warn');});}
 
-  athletes.forEach(a => {
-    const scores = Object.values(a.scores || {});
-    totalScore += scores.reduce((a,b) => a + b, 0);
-    totalStrong += scores.filter(v => v === 3).length;
+// ── LIBRARY ───────────────────────────────────────────────────
+function renderLibList(){
+  const q=(g('libSearchMain')?.value||'').toLowerCase();
+  const filt=store.library.filter(l=>l.toLowerCase().includes(q));
+  const el=g('libMainList');if(!el)return;
+  el.innerHTML=!filt.length?'<div class="text-center text-gray-600 py-8 text-sm">No items found</div>':filt.map(item=>{
+    const i=store.library.indexOf(item);
+    return `<div class="flex items-center gap-3 bg-gray-900 rounded-2xl px-5 py-3.5 border border-gray-800 hover:border-gray-700 group">
+      <span class="flex-1 text-sm font-semibold text-white" id="ln${i}">${esc(item)}</span>
+      <input id="le${i}" type="text" value="${esc(item)}" maxlength="80"
+        class="hidden flex-1 px-2 py-1 rounded-xl bg-gray-800 border border-gray-600 text-sm text-white focus:outline-none focus:border-red-500"
+        onkeydown="if(event.key==='Enter')saveLb(${i});if(event.key==='Escape')cancelLb(${i})">
+      <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+        <button onclick="editLb(${i})"   id="leb${i}" class="text-gray-500 hover:text-orange-400 p-1.5 rounded-lg hover:bg-gray-800 transition">✏️</button>
+        <button onclick="saveLb(${i})"   id="lsb${i}" class="hidden text-gray-500 hover:text-green-400 p-1.5 rounded-lg hover:bg-gray-800 transition">✅</button>
+        <button onclick="deleteLb(${i})" class="text-gray-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-gray-800 transition">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function showAddLib(){g('addLibForm').classList.remove('hidden');g('newLibName').focus();}
+function hideAddLib(){g('addLibForm').classList.add('hidden');g('newLibName').value='';}
+function addLib(){const v=g('newLibName').value.trim();if(!v)return;store.library.push(v);save();hideAddLib();renderLibList();toast('Item added');}
+function editLb(i){g('ln'+i).classList.add('hidden');g('le'+i).classList.remove('hidden');g('leb'+i).classList.add('hidden');g('lsb'+i).classList.remove('hidden');g('le'+i).focus();}
+function cancelLb(i){g('ln'+i).classList.remove('hidden');g('le'+i).classList.add('hidden');g('leb'+i).classList.remove('hidden');g('lsb'+i).classList.add('hidden');}
+function saveLb(i){const v=g('le'+i).value.trim();if(!v)return;store.library[i]=v;save();renderLibList();toast('Updated');}
+function deleteLb(i){confirm2('Delete Item',`Delete "${store.library[i]}"?`,()=>{store.library.splice(i,1);save();renderLibList();toast('Deleted','warn');});}
+
+// ── SWAP TYPES ────────────────────────────────────────────────
+function renderST(){
+  g('stList').innerHTML=store.swapTypes.map((t,i)=>`
+    <div class="flex items-center gap-3 bg-gray-900 rounded-2xl px-5 py-3.5 border border-gray-800 hover:border-gray-700 group">
+      <span class="flex-1 text-sm font-semibold text-white" id="stn${i}">${esc(t)}</span>
+      <input id="ste${i}" type="text" value="${esc(t)}" maxlength="60"
+        class="hidden flex-1 px-2 py-1 rounded-xl bg-gray-800 border border-gray-600 text-sm text-white focus:outline-none focus:border-red-500"
+        onkeydown="if(event.key==='Enter')saveST(${i});if(event.key==='Escape')cancelST(${i})">
+      <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+        <button onclick="editST(${i})"   id="steb${i}" class="text-gray-500 hover:text-orange-400 p-1.5 rounded-lg hover:bg-gray-800 transition">✏️</button>
+        <button onclick="saveST(${i})"   id="stsb${i}" class="hidden text-gray-500 hover:text-green-400 p-1.5 rounded-lg hover:bg-gray-800 transition">✅</button>
+        <button onclick="deleteST(${i})" class="text-gray-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-gray-800 transition">🗑️</button>
+      </div>
+    </div>`).join('');
+}
+function showAddST(){g('addSTForm').classList.remove('hidden');g('newSTName').focus();}
+function hideAddST(){g('addSTForm').classList.add('hidden');g('newSTName').value='';}
+function addST(){const v=g('newSTName').value.trim();if(!v)return;store.swapTypes.push(v);save();hideAddST();renderST();toast('Swap type added');}
+function editST(i){g('stn'+i).classList.add('hidden');g('ste'+i).classList.remove('hidden');g('steb'+i).classList.add('hidden');g('stsb'+i).classList.remove('hidden');g('ste'+i).focus();}
+function cancelST(i){g('stn'+i).classList.remove('hidden');g('ste'+i).classList.add('hidden');g('steb'+i).classList.remove('hidden');g('stsb'+i).classList.add('hidden');}
+function saveST(i){const v=g('ste'+i).value.trim();if(!v)return;const old=store.swapTypes[i];store.swapTypes[i]=v;store.checklists.forEach(c=>{if(c.swapType===old)c.swapType=v;});save();renderST();toast('Updated');}
+function deleteST(i){const u=store.checklists.filter(c=>c.swapType===store.swapTypes[i]).length;confirm2('Delete Swap Type',u?`Used in ${u} checklist(s). Delete anyway?`:`Delete "${store.swapTypes[i]}"?`,()=>{store.swapTypes.splice(i,1);save();renderST();toast('Deleted','warn');});}
+
+// ── CHECKLIST LIST ────────────────────────────────────────────
+function renderCLList(){
+  const q=(g('clSearch')?.value||'').toLowerCase();
+  const ft=g('clFilterType')?.value||'';
+  const ftEl=g('clFilterType');const ftVal=ftEl.value;
+  ftEl.innerHTML='<option value="">All Types</option>'+store.swapTypes.map(t=>`<option value="${esc(t)}"${ftVal===t?' selected':''}>${esc(t)}</option>`).join('');
+  const list=g('clList'),emp=g('clEmpty');
+  const filt=store.checklists.filter(c=>(!q||c.title.toLowerCase().includes(q)||c.fromApparatus.toLowerCase().includes(q)||c.toApparatus.toLowerCase().includes(q))&&(!ft||c.swapType===ft)).sort((a,b)=>new Date(b.lastUpdated)-new Date(a.lastUpdated));
+  if(!filt.length){list.innerHTML='';emp.classList.remove('hidden');return;}
+  emp.classList.add('hidden');
+  list.innerHTML=filt.map(c=>{
+    const sw=c.items.filter(i=>i.swapped).length,tot=c.items.length,pct=tot?Math.round(sw/tot*100):0;
+    const bar=pct===100?'bg-green-500':'bg-gradient-to-r from-red-600 to-orange-400';
+    return `<div class="bg-gray-900 rounded-2xl border border-gray-800 hover:border-red-700 transition group">
+      <div class="flex items-center gap-4 px-5 py-4 cursor-pointer" onclick="openCL('${c.id}')">
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-white text-sm group-hover:text-red-400 transition truncate">${esc(c.title)}</div>
+          <div class="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+            <span class="text-red-400 font-semibold">${esc(c.fromApparatus)}</span><span>→</span>
+            <span class="text-blue-400 font-semibold">${esc(c.toApparatus)}</span>
+            <span class="ml-1 text-orange-400">· ${esc(c.swapType)}</span>
+          </div>
+        </div>
+        <div class="text-right shrink-0">
+          <div class="text-xs text-gray-500">${sw}/${tot} swapped</div>
+          <div class="text-sm font-bold ${pct===100?'text-green-400':'text-white'}">${pct}%</div>
+        </div>
+      </div>
+      <div class="px-5 pb-1"><div class="w-full bg-gray-800 rounded-full h-1.5"><div class="${bar} h-1.5 rounded-full" style="width:${pct}%"></div></div></div>
+      <div class="px-5 py-2.5 flex justify-between items-center border-t border-gray-800 mt-1">
+        <span class="text-xs text-gray-700">${fmtDate(c.lastUpdated)}</span>
+        <button onclick="event.stopPropagation();deleteCLById('${c.id}')" class="text-xs text-gray-600 hover:text-red-400 transition px-2 py-1 rounded hover:bg-gray-800">🗑️ Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── EDITOR ────────────────────────────────────────────────────
+function getCL(){return editId?store.checklists.find(c=>c.id===editId):null;}
+
+function renderEditor(){
+  const apOpts=store.apparatus.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  const other='<option value="__other__">Other…</option>';
+  g('edFrom').innerHTML=apOpts+other;
+  g('edTo').innerHTML=apOpts+other;
+  g('edSwapType').innerHTML=store.swapTypes.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
+  if(editId){
+    const cl=getCL();
+    if(cl){
+      g('edTitle').value=cl.title;
+      setApSel('edFrom','edFromCustom',cl.fromApparatus);
+      setApSel('edTo','edToCustom',cl.toApparatus);
+      g('edSwapType').value=cl.swapType;
+    }
+  } else {
+    g('edTitle').value='';
+    g('edFromCustom').classList.add('hidden');
+    g('edToCustom').classList.add('hidden');
+  }
+  renderBoard();
+}
+function setApSel(sid,cid,val){
+  if(store.apparatus.includes(val)){g(sid).value=val;g(cid).classList.add('hidden');}
+  else{g(sid).value='__other__';g(cid).classList.remove('hidden');g(cid).value=val;}
+}
+function onFromChange(){g('edFromCustom').classList.toggle('hidden',g('edFrom').value!=='__other__');updateTitle();}
+function onToChange(){g('edToCustom').classList.toggle('hidden',g('edTo').value!=='__other__');updateTitle();}
+function getFrom(){return g('edFrom').value==='__other__'?(g('edFromCustom').value||'Other'):g('edFrom').value;}
+function getTo(){return g('edTo').value==='__other__'?(g('edToCustom').value||'Other'):g('edTo').value;}
+function updateTitle(){const t=g('edTitle');if(!t.value||t.value.startsWith('Swap from '))t.value=`Swap from ${getFrom()} to ${getTo()}`;autoSave();}
+
+function autoSave(){
+  const title=g('edTitle')?.value.trim()||'Untitled Swap';
+  const from=getFrom(),to=getTo(),st=g('edSwapType')?.value||(store.swapTypes[0]||'');
+  const now=new Date().toISOString();
+  if(editId){const cl=getCL();if(cl){cl.title=title;cl.fromApparatus=from;cl.toApparatus=to;cl.swapType=st;cl.lastUpdated=now;}}
+  else{const nc={id:uid(),title,fromApparatus:from,toApparatus:to,swapType:st,items:[],createdAt:now,lastUpdated:now};store.checklists.push(nc);editId=nc.id;}
+  save();updateColLabels();updateProgress();
+}
+
+function updateColLabels(){
+  const cl=getCL();
+  g('colFromLabel').textContent=(cl?cl.fromApparatus:getFrom())||'From Apparatus';
+  g('colToLabel').textContent=(cl?cl.toApparatus:getTo())||'To Apparatus';
+}
+
+function renderBoard(){
+  const cl=getCL();
+  const items=cl?cl.items:[];
+  const fromItems=items.filter(i=>!i.swapped);
+  const toItems=items.filter(i=>i.swapped);
+  updateColLabels();
+  g('colFromCount').textContent=fromItems.length;
+  g('colToCount').textContent=toItems.length;
+  // FROM
+  if(!fromItems.length){g('colFromItems').innerHTML='';g('colFromItems').classList.add('hidden');g('colFromEmpty').classList.remove('hidden');}
+  else{g('colFromEmpty').classList.add('hidden');g('colFromItems').classList.remove('hidden');g('colFromItems').innerHTML=fromItems.map(item=>itemCard(item,'from')).join('');}
+  // TO
+  if(!toItems.length){g('colToItems').innerHTML='';g('colToItems').classList.add('hidden');g('colToEmpty').classList.remove('hidden');}
+  else{g('colToEmpty').classList.add('hidden');g('colToItems').classList.remove('hidden');g('colToItems').innerHTML=toItems.map(item=>itemCard(item,'to')).join('');}
+  updateProgress();
+}
+
+function itemCard(item,side){
+  const border=side==='from'?'item-from':'item-to';
+  const hover=side==='from'?'hover:bg-blue-950/30 hover:border-blue-700/50':'hover:bg-red-950/30 hover:border-red-700/50';
+  const arrow=side==='from'?'→':'←';
+  const arrowClr=side==='from'?'text-blue-500':'text-red-500';
+  const hint=side==='from'?'Move to TO apparatus':'Move back to FROM apparatus';
+  return `<div class="item-card ${border} ${hover} bg-gray-800 rounded-xl px-4 py-3 flex items-center gap-3 border border-gray-700 cursor-pointer group transition"
+    onclick="swapItem('${item.id}')" title="${hint}" role="button" aria-label="${esc(item.name)} – ${hint}">
+    <div class="flex-1 min-w-0">
+      <div class="text-sm font-semibold text-white truncate">${esc(item.name)}</div>
+    </div>
+    <span class="${arrowClr} text-lg font-black shrink-0 opacity-40 group-hover:opacity-100 transition">${arrow}</span>
+    <button onclick="event.stopPropagation();confirmDelItem('${item.id}')"
+      class="text-gray-700 hover:text-red-400 text-xs p-1 rounded opacity-0 group-hover:opacity-100 transition shrink-0" title="Remove">✕</button>
+  </div>`;
+}
+
+function swapItem(itemId){
+  if(!editId)autoSave();
+  const cl=getCL();if(!cl)return;
+  const item=cl.items.find(i=>i.id===itemId);if(!item)return;
+  item.swapped=!item.swapped;
+  cl.lastUpdated=new Date().toISOString();
+  save();renderBoard();
+}
+
+function confirmDelItem(itemId){
+  const cl=getCL();if(!cl)return;
+  const item=cl.items.find(i=>i.id===itemId);if(!item)return;
+  confirm2('Remove Item',`Remove "${item.name}" from this checklist?`,()=>{
+    cl.items=cl.items.filter(i=>i.id!==itemId);
+    cl.lastUpdated=new Date().toISOString();
+    save();renderBoard();toast('Item removed');
   });
-
-  const avgScore = (totalScore / totalVirtues).toFixed(1);
-  const strongPercent = Math.round((totalStrong / totalVirtues) * 100);
-
-  return { avgScore, strongPercent, totalAthletes: athletes.length };
 }
 
-// ─── MODALS ───────────────────────────────────────────────────────────────────
-function Modal({title, onClose, children}) {
-  return (
-    <div style={{position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", zIndex:500, display:"flex", alignItems:"center", justifyContent:"center"}} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{background:"#fff", borderRadius:16, width:"92%", maxWidth:720, maxHeight:"92vh", overflow:"hidden", boxShadow:"0 25px 70px rgba(0,0,0,0.25)"}}>
-        <div style={{padding:"18px 24px", borderBottom:"1px solid #dee2e6", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-          <span style={{fontSize:21, fontWeight:800, color:C.orange}}>{title}</span>
-          <button onClick={onClose} style={{fontSize:24, background:"none", border:"none", color:"#666"}}>✕</button>
-        </div>
-        <div style={{padding:24, overflowY:"auto", maxHeight:"78vh"}}>{children}</div>
-      </div>
-    </div>
-  );
+function resetSwap(){
+  const cl=getCL();if(!cl||!cl.items.length)return;
+  confirm2('Reset Swap','Move all items back to the FROM column?',()=>{
+    cl.items.forEach(i=>i.swapped=false);
+    cl.lastUpdated=new Date().toISOString();
+    save();renderBoard();toast('All items reset to From','warn');
+  });
 }
 
-function ConfirmDelete({name, onConfirm, onCancel}) {
-  return (
-    <Modal title="Delete Athlete" onClose={onCancel}>
-      <p style={{fontSize:16, marginBottom:24}}>Are you sure you want to permanently delete <strong>{name}</strong>?</p>
-      <p style={{color:"#ef4444", marginBottom:24}}>This cannot be undone.</p>
-      <div style={{display:"flex", gap:12, justifyContent:"flex-end"}}>
-        <button onClick={onCancel} style={{padding:"12px 24px", border:"none", background:"#ddd", borderRadius:10}}>Cancel</button>
-        <button onClick={onConfirm} style={{padding:"12px 28px", border:"none", background:"#ef4444", color:"#fff", borderRadius:10, fontWeight:700}}>Yes, Delete</button>
-      </div>
-    </Modal>
-  );
+function updateProgress(){
+  const cl=getCL();
+  if(!cl||!cl.items.length){g('edProgLabel').textContent='0 of 0 swapped';g('edProgBar').style.width='0%';g('edProgPct').textContent='0%';g('edProgPct').style.color='#6b7280';return;}
+  const tot=cl.items.length,sw=cl.items.filter(i=>i.swapped).length,pct=Math.round(sw/tot*100);
+  g('edProgLabel').textContent=`${sw} of ${tot} swapped`;
+  g('edProgBar').style.width=pct+'%';
+  g('edProgPct').textContent=pct+'%';
+  g('edProgPct').style.color=pct===100?'#4ade80':'#6b7280';
 }
 
-// ─── EDIT MODAL ───────────────────────────────────────────────────────────────
-function EditModal({person, onSave, onClose}) {
-  const [data, setData] = useState({...person, notes: person.notes || ""});
-
-  const updateScore = (key, value) => setData(prev => ({...prev, scores: {...prev.scores, [key]: Number(value)}}));
-
-  return (
-    <Modal title={data.id ? "Edit Athlete" : "Add New Athlete"} onClose={onClose}>
-      <input placeholder="Athlete Name *" value={data.name||""} onChange={e=>setData({...data,name:e.target.value})} style={{width:"100%", padding:14, fontSize:17, border:`2px solid ${C.border}`, borderRadius:10, marginBottom:12}} />
-      <input placeholder="Role / Team (optional)" value={data.role||""} onChange={e=>setData({...data,role:e.target.value})} style={{width:"100%", padding:14, fontSize:17, border:`2px solid ${C.border}`, borderRadius:10, marginBottom:20}} />
-
-      <div style={{marginBottom:20}}>
-        <div style={{fontWeight:700, color:C.orange, marginBottom:12}}>Score Each Virtue (0–3)</div>
-        {Object.values(VIRTUES).map(t => (
-          <div key={t.key} style={{marginBottom:16, padding:16, background:"#fff", border:`1px solid ${t.border}`, borderRadius:12}}>
-            <div style={{display:"flex", alignItems:"center", gap:12, marginBottom:8}}>
-              <span style={{fontSize:28}}>{t.icon}</span>
-              <div style={{flex:1, fontWeight:700, color:t.color}}>{t.label}</div>
-            </div>
-            <div style={{fontSize:13, color:"#555", marginBottom:10}}>{t.scoreMeaning}</div>
-            <div style={{display:"flex", gap:6}}>
-              {[0,1,2,3].map(n => (
-                <button key={n} onClick={()=>updateScore(t.key,n)} style={{flex:1, padding:"10px", borderRadius:8, background: data.scores[t.key]===n ? C.orange : "#f1f3f5", color: data.scores[t.key]===n ? "#fff" : "#333", fontWeight:700}}>
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{marginBottom:20}}>
-        <div style={{fontWeight:700, marginBottom:8}}>Notes / Observations / Prayers</div>
-        <textarea value={data.notes} onChange={e=>setData({...data, notes:e.target.value})} placeholder="Key moments, growth areas, specific prayers..." style={{width:"100%", height:130, padding:14, border:`2px solid ${C.border}`, borderRadius:10, resize:"vertical"}} />
-      </div>
-
-      <div style={{display:"flex", gap:12, justifyContent:"flex-end"}}>
-        <button onClick={onClose} style={{padding:"12px 24px", border:"none", background:"#ddd", borderRadius:10}}>Cancel</button>
-        <button onClick={()=>onSave(data)} style={{padding:"12px 32px", border:"none", background:C.orange, color:"#fff", borderRadius:10, fontWeight:700}} disabled={!data.name?.trim()}>💾 Save Changes</button>
-      </div>
-    </Modal>
-  );
+// ── CUSTOM ITEM ───────────────────────────────────────────────
+function toggleCustomForm(){const f=g('customForm');f.classList.toggle('hidden');if(!f.classList.contains('hidden'))g('customInput').focus();}
+function hideCustomForm(){g('customForm').classList.add('hidden');g('customInput').value='';}
+function addCustom(){
+  const v=g('customInput').value.trim();if(!v)return;
+  if(!editId)autoSave();
+  const cl=getCL();if(!cl)return;
+  cl.items.push({id:uid(),name:v,swapped:false});
+  cl.lastUpdated=new Date().toISOString();
+  save();hideCustomForm();renderBoard();toast('Item added');
 }
 
-// ─── PERSON DETAIL ────────────────────────────────────────────────────────────
-function PersonDetail({person, onClose, onEdit}) {
-  const [tab, setTab] = useState("assess");
-  const combo = getCombo(person.scores);
+// ── LIBRARY MODAL ─────────────────────────────────────────────
+function openLibModal(){libSel=[];g('libModal').classList.remove('hidden');g('libSearch').value='';renderLibModal();g('libSearch').focus();}
+function closeLibModal(){g('libModal').classList.add('hidden');}
+function renderLibModal(){
+  const q=g('libSearch').value.toLowerCase();
+  const filt=store.library.filter(l=>l.toLowerCase().includes(q));
+  g('libList').innerHTML=filt.map(item=>{
+    const sel=libSel.includes(item);
+    return `<label class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-700 cursor-pointer transition ${sel?'bg-gray-700':''}">
+      <input type="checkbox" ${sel?'checked':''} onchange="toggleLibSel(this,'${esc(item)}')" class="shrink-0" style="accent-color:#dc2626;width:16px;height:16px;">
+      <span class="text-sm text-gray-200">${esc(item)}</span>
+    </label>`;
+  }).join('')||'<div class="text-center text-gray-600 text-sm py-6">No items found</div>';
+  g('libSelCount').textContent=libSel.length+' selected';
+}
+function toggleLibSel(chk,raw){
+  const item=raw.replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+  if(chk.checked){if(!libSel.includes(item))libSel.push(item);}else{libSel=libSel.filter(i=>i!==item);}
+  g('libSelCount').textContent=libSel.length+' selected';
+}
+function confirmLibAdd(){
+  if(!libSel.length){closeLibModal();return;}
+  if(!editId)autoSave();
+  const cl=getCL();if(!cl)return;
+  libSel.forEach(name=>cl.items.push({id:uid(),name,swapped:false}));
+  cl.lastUpdated=new Date().toISOString();
+  save();closeLibModal();renderBoard();toast(libSel.length+' item(s) added');
+}
 
-  return (
-    <Modal title={person.name} onClose={onClose}>
-      <div style={{display:"flex", justifyContent:"space-between", marginBottom:20}}>
+// ── DELETE CHECKLISTS ─────────────────────────────────────────
+function deleteCurrent(){
+  const cl=getCL();
+  confirm2('Delete Checklist',`Delete "${cl?.title}"? This cannot be undone.`,()=>{
+    store.checklists=store.checklists.filter(c=>c.id!==editId);
+    save();editId=null;toast('Deleted','warn');showTab('checklists');
+  });
+}
+function deleteCLById(id){
+  const cl=store.checklists.find(c=>c.id===id);
+  confirm2('Delete Checklist',`Delete "${cl?.title}"?`,()=>{
+    store.checklists=store.checklists.filter(c=>c.id!==id);
+    save();toast('Deleted','warn');renderCLList();renderDash();
+  });
+}
+
+// ── PRINT ─────────────────────────────────────────────────────
+function printCL(){
+  const cl=getCL();if(!cl){toast('Save checklist first','warn');return;}
+  const fromItems=cl.items.filter(i=>!i.swapped),toItems=cl.items.filter(i=>i.swapped);
+  const sw=toItems.length,tot=cl.items.length;
+  g('printContent').innerHTML=`
+    <div style="font-family:Arial,sans-serif;max-width:720px;margin:0 auto">
+      <div style="border-bottom:4px solid #dc2626;padding-bottom:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-end">
         <div>
-          <div style={{fontSize:52}}>{combo.icon}</div>
-          <div style={{fontSize:24, fontWeight:800, color:combo.color}}>{combo.label}</div>
+          <div style="font-size:10px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px">🔥 FD SwapCheck</div>
+          <h1 style="font-size:20px;font-weight:900;color:#111;margin:0">${esc(cl.title)}</h1>
+          <div style="font-size:12px;color:#555;margin-top:4px"><strong>${esc(cl.swapType)}</strong> · Printed ${new Date().toLocaleDateString()}</div>
         </div>
-        <button onClick={()=>{ onEdit(person); onClose(); }} style={{background:C.orange, color:"#fff", border:"none", padding:"10px 22px", borderRadius:10, fontWeight:700}}>✏ Edit</button>
+        <div style="text-align:right;font-size:12px;color:#555">${sw} of ${tot} swapped (${tot?Math.round(sw/tot*100):0}%)</div>
       </div>
-
-      <div style={{marginBottom:24}}>
-        <div style={{display:"flex", justifyContent:"space-between", fontSize:14, marginBottom:8}}>
-          <span>Character Progress</span>
-          <span>{combo.progress}%</span>
-        </div>
-        <div className="progress-bar">
-          <div className="progress-fill" style={{width: `${combo.progress}%`, background: combo.progress > 80 ? "linear-gradient(90deg,#00b36b,#34d399)" : combo.progress > 50 ? "linear-gradient(90deg,#ff8c00,#ffaa00)" : "#dc3545"}} />
-        </div>
-        <div style={{fontSize:13, color:C.textMuted, marginTop:6}}>
-          Last updated: {person.lastUpdated ? new Date(person.lastUpdated).toLocaleDateString() : "Never"}
-        </div>
-      </div>
-
-      <div style={{display:"flex", borderBottom:"3px solid #ff8c00", marginBottom:20}}>
-        {["assess","develop","notes"].map(t => (
-          <button key={t} onClick={()=>setTab(t)} style={{flex:1, padding:"14px", fontWeight:700, background:tab===t?C.orange:"#f1f3f5", color:tab===t?"#fff":"#333", border:"none"}}>
-            {t==="assess"?"📊 Profile":t==="develop"?"🛠 Develop":"📝 Notes"}
-          </button>
-        ))}
-      </div>
-
-      {tab==="assess" && Object.entries(person.scores).map(([k,v]) => {
-        const t = VIRTUES[k];
-        const showHas = v >= 2;
-        return (
-          <div key={k} style={{marginBottom:20, background:"#fff", border:`2px solid ${t.border}`, borderRadius:14, overflow:"hidden"}}>
-            <div style={{background:t.bg, padding:"16px 20px", display:"flex", alignItems:"center", gap:16}}>
-              <span style={{fontSize:42}}>{t.icon}</span>
-              <div style={{flex:1}}><div style={{fontSize:21, fontWeight:800, color:t.color}}>{t.label}</div></div>
-              <span style={{fontSize:18, fontWeight:700}}>{v}/3</span>
-            </div>
-            <div style={{padding:"20px"}}>
-              {(showHas ? t.strong : t.weak).map((s,i) => (
-                <div key={i} style={{marginBottom:6}}>{showHas?"→":"–"} {s}</div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-
-      {tab==="develop" && (
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
         <div>
-          {Object.entries(person.scores).map(([k,v]) => {
-            const t = VIRTUES[k];
-            return (
-              <div key={k} style={{marginBottom:20, background:"#fff", border:`2px solid ${t.border}`, borderRadius:14, overflow:"hidden"}}>
-                <div style={{background:t.bg, padding:"14px 20px", display:"flex", alignItems:"center", gap:12}}>
-                  <span style={{fontSize:28}}>{t.icon}</span>
-                  <div style={{fontSize:18, fontWeight:800, color:t.color, flex:1}}>{t.label}</div>
-                  <span style={{fontSize:14, color:C.textMuted, background:"#fff", padding:"4px 10px", borderRadius:20, fontWeight:700}}>{SCORE_LABELS[v]}</span>
-                </div>
-                <div style={{padding:"16px 20px"}}>
-                  {t.develop.map((step,i) => (
-                    <div key={i} style={{display:"flex", gap:12, marginBottom:10, alignItems:"flex-start"}}>
-                      <span style={{background:C.orange, color:"#fff", borderRadius:"50%", width:22, height:22, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:800, flexShrink:0}}>{i+1}</span>
-                      <span style={{fontSize:14, color:C.text, lineHeight:1.5}}>{step}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+          <div style="background:#7f1d1d;color:white;padding:8px 12px;border-radius:8px 8px 0 0;font-weight:800;font-size:13px">FROM: ${esc(cl.fromApparatus)} <span style="font-weight:400;font-size:11px;opacity:.8">(${fromItems.length} here)</span></div>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #fee2e2">
+            ${fromItems.length?fromItems.map((item,i)=>`<tr style="border-bottom:1px solid #fecaca;background:${i%2===0?'#fff7f7':'white'}"><td style="padding:8px 10px;font-size:11px;color:#9ca3af;width:24px">${i+1}</td><td style="padding:8px 10px;font-size:12px;color:#111">${esc(item.name)}</td><td style="padding:8px 10px;width:70px;border-left:1px solid #fecaca;font-size:10px;color:#9ca3af">Init.</td></tr>`).join(''):'<tr><td colspan="3" style="padding:16px;text-align:center;color:#9ca3af;font-size:12px">All items swapped ✅</td></tr>'}
+          </table>
         </div>
-      )}
-
-      {tab==="notes" && (
-        <div style={{background:"#fff", border:`1px solid ${C.border}`, borderRadius:12, padding:24, minHeight:200, whiteSpace:"pre-wrap", fontSize:15}}>
-          {person.notes || "No notes added yet."}
+        <div>
+          <div style="background:#1e3a5f;color:white;padding:8px 12px;border-radius:8px 8px 0 0;font-weight:800;font-size:13px">TO: ${esc(cl.toApparatus)} <span style="font-weight:400;font-size:11px;opacity:.8">(${toItems.length} swapped)</span></div>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #dbeafe">
+            ${toItems.length?toItems.map((item,i)=>`<tr style="border-bottom:1px solid #bfdbfe;background:${i%2===0?'#eff6ff':'white'}"><td style="padding:8px 10px;font-size:11px;color:#9ca3af;width:24px">${i+1}</td><td style="padding:8px 10px;font-size:12px;color:#374151;text-decoration:line-through">${esc(item.name)}</td><td style="padding:8px 10px;width:70px;border-left:1px solid #bfdbfe;text-align:center;font-weight:700;color:#059669;font-size:12px">✓</td></tr>`).join(''):'<tr><td colspan="3" style="padding:16px;text-align:center;color:#9ca3af;font-size:12px">Nothing swapped yet</td></tr>'}
+          </table>
         </div>
-      )}
-    </Modal>
-  );
+      </div>
+      <div style="margin-top:28px;display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div style="border-top:1px solid #374151;padding-top:8px"><div style="font-size:10px;color:#9ca3af">Completed By (Print Name)</div><div style="height:28px"></div></div>
+        <div style="border-top:1px solid #374151;padding-top:8px"><div style="font-size:10px;color:#9ca3af">Signature / Badge # / Date</div><div style="height:28px"></div></div>
+      </div>
+      <div style="margin-top:14px;font-size:9px;color:#d1d5db;border-top:1px solid #e5e7eb;padding-top:8px">Generated by FD SwapCheck · ${new Date().toLocaleString()}</div>
+    </div>`;
+  window.print();
 }
 
-const BLANK_ATHLETE = { id:"", name:"", role:"", notes:"", scores:{L:1,P:1,S:1,G:1,H:1,Gr:1,J:1}, lastUpdated: null };
-
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
-function App() {
-  const [tab, setTab] = useState("athletes");
-  const [athletes, setAthletes] = useState(() => load("awaygame_athletes_v1", []));
-  const [editing, setEditing] = useState(null);
-  const [viewing, setViewing] = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
-
-  function saveAthlete(p) {
-    const updated = {...p, id: p.id || uid(), lastUpdated: Date.now()};
-    const next = p.id ? athletes.map(x => x.id === p.id ? updated : x) : [...athletes, updated];
-    setAthletes(next);
-    save("awaygame_athletes_v1", next);
-    setEditing(null);
-  }
-
-  function deleteAthlete(id) {
-    const next = athletes.filter(a => a.id !== id);
-    setAthletes(next);
-    save("awaygame_athletes_v1", next);
-    setDeleteConfirm(null);
-    if (viewing && viewing.id === id) setViewing(null);
-  }
-
-  const teamStats = calculateTeamProgress(athletes);
-
-  return (
-    <div style={{minHeight:"100vh", background:"#f8f9fa"}}>
-      {/* HEADER */}
-      <div style={{background:"#fff", borderBottom:"4px solid #ff8c00", padding:"0 24px", height:76, display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:"0 3px 12px rgba(0,0,0,0.1)"}}>
-        <div>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif", fontWeight:900, fontSize:32, letterSpacing:1.5, color:C.orange}}>AWAY GAME</div>
-          <div style={{fontSize:13, color:"#555"}}>Christian Parent’s Playbook</div>
-        </div>
-        <div style={{display:"flex", gap:8}}>
-          <button onClick={()=>setTab("athletes")} style={{padding:"10px 22px", borderRadius:10, background:tab==="athletes"?C.orange:"#fff", color:tab==="athletes"?"#fff":"#333", fontWeight:700, border:"2px solid #ff8c00"}}>👥 My Athletes</button>
-          <button onClick={()=>setTab("playbook")} style={{padding:"10px 22px", borderRadius:10, background:tab==="playbook"?C.orange:"#fff", color:tab==="playbook"?"#fff":"#333", fontWeight:700, border:"2px solid #ff8c00"}}>📖 The Playbook</button>
-        </div>
-      </div>
-
-      {tab === "athletes" && (
-        <div style={{padding:24}}>
-          {/* TEAM PROGRESS DASHBOARD */}
-          {athletes.length > 0 && (
-            <div className="team-card" style={{marginBottom:32}}>
-              <div style={{fontSize:20, fontWeight:800, marginBottom:16, color:C.orange}}>Team Progress Overview</div>
-              <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))", gap:20}}>
-                <div>
-                  <div style={{fontSize:13, color:C.textMuted}}>Team Average Score</div>
-                  <div style={{fontSize:32, fontWeight:800, color:C.orange}}>{teamStats.avgScore}</div>
-                  <div style={{fontSize:13}}>out of 3.0</div>
-                </div>
-                <div>
-                  <div style={{fontSize:13, color:C.textMuted}}>Strong Virtues</div>
-                  <div style={{fontSize:32, fontWeight:800, color: teamStats.strongPercent > 70 ? C.green : C.orange}}>{teamStats.strongPercent}%</div>
-                </div>
-                <div>
-                  <div style={{fontSize:13, color:C.textMuted}}>Athletes Tracked</div>
-                  <div style={{fontSize:32, fontWeight:800}}>{teamStats.totalAthletes}</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:28}}>
-            <h1 style={{fontSize:28, fontWeight:800}}>My Athletes</h1>
-            <button onClick={()=>setEditing(BLANK_ATHLETE)} style={{background:C.orange, color:"#fff", border:"none", padding:"12px 28px", borderRadius:12, fontWeight:700}}>＋ Add Athlete</button>
-          </div>
-
-          {athletes.length === 0 ? (
-            <div style={{textAlign:"center", padding:"120px 20px", color:"#666"}}>
-              <div style={{fontSize:80}}>⚽️🏀🏈</div>
-              <div style={{fontSize:24, margin:"20px 0"}}>Start building your team’s character</div>
-              <button onClick={()=>setEditing(BLANK_ATHLETE)} style={{background:C.orange, color:"#fff", padding:"14px 36px", borderRadius:12, fontSize:17, fontWeight:700}}>Add Your First Athlete</button>
-            </div>
-          ) : (
-            <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(310px, 1fr))", gap:20}}>
-              {athletes.map(p => {
-                const combo = getCombo(p.scores);
-                return (
-                  <div key={p.id} style={{background:"#fff", border:`1px solid ${C.border}`, borderRadius:16, padding:22, boxShadow:"0 6px 20px rgba(0,0,0,0.07)", position:"relative"}}>
-                    <button 
-                      onClick={(e)=>{e.stopPropagation(); setDeleteConfirm(p);}} 
-                      className="delete-btn" 
-                      style={{position:"absolute", top:12, right:12}}
-                    >
-                      🗑
-                    </button>
-                    
-                    <div onClick={()=>setViewing(p)} style={{cursor:"pointer"}}>
-                      <div style={{fontSize:22, fontWeight:800, marginBottom:8}}>{p.name}</div>
-                      {p.role && <div style={{color:C.textSub, marginBottom:12}}>{p.role}</div>}
-                      
-                      <div style={{display:"flex", gap:8, flexWrap:"wrap", marginBottom:16}}>
-                        {Object.entries(p.scores).map(([k,v]) => (
-                          <div key={k} style={{background:VIRTUES[k].bg, padding:"6px 10px", borderRadius:8, fontSize:14}}>{VIRTUES[k].icon} {v}</div>
-                        ))}
-                      </div>
-
-                      <div style={{marginBottom:12}}>
-                        <div className="progress-bar">
-                          <div className="progress-fill" style={{width: `${combo.progress}%`, background: combo.progress > 80 ? "linear-gradient(90deg,#00b36b,#34d399)" : combo.progress > 50 ? "linear-gradient(90deg,#ff8c00,#ffaa00)" : "#dc3545"}} />
-                        </div>
-                      </div>
-
-                      <div style={{fontSize:13, color:C.textMuted}}>Last updated: {p.lastUpdated ? new Date(p.lastUpdated).toLocaleDateString() : "Never"}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {tab === "playbook" && (
-        <div style={{padding:24, maxWidth:820, margin:"0 auto"}}>
-          <h2 style={{color:C.orange, marginBottom:8}}>The Seven Virtues</h2>
-          <p style={{color:C.textSub, marginBottom:32}}>Fruit of the Spirit applied to youth sports.</p>
-          {Object.values(VIRTUES).map(t => (
-            <div key={t.key} style={{marginBottom:24, background:"#fff", border:`1px solid ${t.border}`, borderRadius:16, padding:24}}>
-              <div style={{display:"flex", alignItems:"center", gap:16}}>
-                <span style={{fontSize:48}}>{t.icon}</span>
-                <div>
-                  <div style={{fontSize:22, fontWeight:800, color:t.color}}>{t.label}</div>
-                  <div style={{color:C.textSub}}>"{t.tagline}"</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {editing && <EditModal person={editing} onSave={saveAthlete} onClose={()=>setEditing(null)} />}
-      {viewing && <PersonDetail person={viewing} onClose={()=>setViewing(null)} onEdit={p=>{setViewing(null); setEditing(p);}} />}
-      {deleteConfirm && <ConfirmDelete name={deleteConfirm.name} onConfirm={()=>deleteAthlete(deleteConfirm.id)} onCancel={()=>setDeleteConfirm(null)} />}
-    </div>
-  );
+// ── EXPORT / IMPORT ───────────────────────────────────────────
+function exportAll(){const b=new Blob([JSON.stringify(store,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='fd-swapcheck-backup.json';a.click();toast('Backup exported!');}
+function exportSingle(){const cl=getCL();if(!cl){toast('Nothing to export','warn');return;}const b=new Blob([JSON.stringify(cl,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`swapcheck-${cl.id}.json`;a.click();toast('Checklist exported');}
+function triggerImport(){g('importFile').click();}
+let pendingImport=null;
+function handleImportFile(e){const file=e.target.files[0];if(!file)return;const r=new FileReader();r.onload=ev=>{try{pendingImport=JSON.parse(ev.target.result);g('importModal').classList.remove('hidden');}catch{toast('Invalid JSON','error');}e.target.value='';};r.readAsText(file);}
+function closeImportModal(){g('importModal').classList.add('hidden');pendingImport=null;}
+function doImport(mode){
+  if(!pendingImport)return;closeImportModal();
+  if(mode==='replace'){if(pendingImport.apparatus!==undefined)store=pendingImport;else if(pendingImport.id&&pendingImport.items){store.checklists=store.checklists.filter(c=>c.id!==pendingImport.id);store.checklists.push(pendingImport);}save();toast('Data replaced');}
+  else{if(pendingImport.apparatus!==undefined){pendingImport.apparatus?.forEach(a=>{if(!store.apparatus.includes(a))store.apparatus.push(a);});pendingImport.library?.forEach(l=>{if(!store.library.includes(l))store.library.push(l);});pendingImport.swapTypes?.forEach(t=>{if(!store.swapTypes.includes(t))store.swapTypes.push(t);});pendingImport.checklists?.forEach(c=>{if(!store.checklists.find(x=>x.id===c.id))store.checklists.push(c);});}else if(pendingImport.id&&pendingImport.items){if(!store.checklists.find(x=>x.id===pendingImport.id))store.checklists.push(pendingImport);}save();toast('Data merged');}
+  render(currentTab);
 }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(React.createElement(App));
+// ── CONFIRM MODAL ─────────────────────────────────────────────
+let confCb=null;
+function confirm2(title,msg,cb){g('confTitle').textContent=title;g('confMsg').textContent=msg;confCb=cb;g('confirmModal').classList.remove('hidden');g('confOk').onclick=()=>{closeConfirm();if(confCb)confCb();};}
+function closeConfirm(){g('confirmModal').classList.add('hidden');confCb=null;}
+
+// ── TOAST ─────────────────────────────────────────────────────
+function toast(msg,type='success'){
+  const c={success:'bg-green-600',warn:'bg-orange-600',error:'bg-red-700'};
+  const d=document.createElement('div');
+  d.className=`toast px-4 py-2.5 rounded-xl text-sm font-semibold text-white shadow-2xl ${c[type]||c.success}`;
+  d.textContent=msg;g('toastBox').appendChild(d);setTimeout(()=>d.remove(),3000);
+}
+
+// ── KEYBOARD ──────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='p'&&currentTab==='editor'){e.preventDefault();printCL();}});
+
+// ── INIT ──────────────────────────────────────────────────────
+loadStore();
+showTab('dashboard');
 </script>
 </body>
 </html>
